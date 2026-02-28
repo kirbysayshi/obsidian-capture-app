@@ -90,12 +90,20 @@ export function buildNoteContent({
 
 /**
  * Build a canvas note (JSON).
+ * - URL + text → link node and text node side-by-side, connected by an edge
+ * - URL only  → single link node
+ * - Text only → single text node
  */
-export function buildCanvasContent(url: string): string {
-  return JSON.stringify({
-    nodes: [{ id: '1', type: 'link', url, x: 0, y: 0, width: 460, height: 360 }],
-    edges: [],
-  });
+export function buildCanvasContent(url: string, noteText: string): string {
+  const W = 460, H = 360, GAP = 40;
+  const nodes: object[] = [];
+  const edges: object[] = [];
+
+  if (url)      nodes.push({ id: '1', type: 'link', url,            x: 0,                   y: 0, width: W, height: H });
+  if (noteText) nodes.push({ id: '2', type: 'text', text: noteText, x: url ? W + GAP : 0,  y: 0, width: W, height: H });
+  if (url && noteText) edges.push({ id: 'e1', fromNode: '1', fromSide: 'right', toNode: '2', toSide: 'left' });
+
+  return JSON.stringify({ nodes, edges });
 }
 
 function escapeFrontmatter(str: string): string {

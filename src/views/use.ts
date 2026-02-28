@@ -155,13 +155,24 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     const slug = makeSlug(slugSource) || 'capture';
     const ts = makeTimestamp();
 
-    const useCanvas = config.canvas && Boolean(extractedUrl);
-    const ext = useCanvas ? '.canvas' : '.md';
+    const ext = config.canvas ? '.canvas' : '.md';
     const filename = `${ts}-${slug}${ext}`;
 
+    // For a link node, prefer the bookmarklet-captured URL then scan the what field
+    const canvasUrl = extractedUrl || extractUrl(what);
+
     let content: string;
-    if (useCanvas) {
-      content = buildCanvasContent(extractedUrl);
+    if (config.canvas) {
+      // Always produce a canvas file; node type depends on whether we have a URL
+      const noteText = buildNoteContent({
+        what,
+        who,
+        why,
+        props: config.props,
+        bodyText: isBookmarklet ? extractedBodyText : '',
+        url: extractedUrl,
+      });
+      content = buildCanvasContent(canvasUrl, noteText);
     } else {
       content = buildNoteContent({
         what,
@@ -202,4 +213,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       }, 300);
     }
   });
+}
+
+/** Return the first http(s) URL found in a string, or empty string. */
+function extractUrl(text: string): string {
+  return text.match(/https?:\/\/\S+/)?.[0] ?? '';
 }
