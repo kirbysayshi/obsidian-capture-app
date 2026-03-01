@@ -89,6 +89,32 @@ export function buildNoteContent({
 }
 
 /**
+ * Build plain markdown text for a canvas text node — no frontmatter,
+ * since Obsidian canvas ignores and hides YAML frontmatter in text nodes.
+ */
+export function buildCanvasNoteText({
+  what,
+  who,
+  why,
+  bodyText = '',
+  url = '',
+}: NoteContentParams): string {
+  const lines: string[] = [];
+  if (what) lines.push(`**What:** ${what}`);
+  if (who)  lines.push(`**Who:** ${who}`);
+  if (why)  lines.push(`**Why:** ${why}`);
+  if (bodyText) {
+    lines.push('');
+    lines.push(bodyText.trim());
+  }
+  if (url) {
+    lines.push('');
+    lines.push(`Source: ${url}`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Build a canvas note (JSON).
  * - URL + text → link node and text node side-by-side, connected by an edge
  * - URL only  → single link node
