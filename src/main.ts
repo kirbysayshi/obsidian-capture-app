@@ -2,6 +2,10 @@ import './style.css';
 import { renderConfigure } from './views/configure.js';
 import { renderUse } from './views/use.js';
 
+if (!import.meta.env.DEV && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+
 const params = new URLSearchParams(window.location.search);
 const app = document.getElementById('app')!;
 
