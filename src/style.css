@@ -165,9 +165,11 @@ button.danger {
   min-width: 0;
 }
 
-.emoji-input {
-  flex: 0 0 58px;
-  width: 58px;
+/* Higher specificity (0,2,0) beats the width:auto override (0,1,1) above */
+.name-emoji-row .emoji-input {
+  flex: 0 0 52px;
+  width: 52px;
+  max-width: 52px;
   text-align: center;
   font-size: 1.4rem;
   padding: 6px 4px;
