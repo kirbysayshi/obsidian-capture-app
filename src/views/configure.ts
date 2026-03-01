@@ -44,6 +44,7 @@ export function renderConfigure(root: HTMLElement): void {
           <div class="copy-row">
             <input type="text" id="useUrlInput" readonly>
             <button id="btnCopyUrl">Copy</button>
+            <button id="btnOpenUrl">Open</button>
           </div>
         </div>
 
@@ -69,6 +70,7 @@ export function renderConfigure(root: HTMLElement): void {
   const outputSection = root.querySelector<HTMLElement>('#outputSection')!;
   const useUrlInput = root.querySelector<HTMLInputElement>('#useUrlInput')!;
   const btnCopyUrl = root.querySelector<HTMLButtonElement>('#btnCopyUrl')!;
+  const btnOpenUrl = root.querySelector<HTMLButtonElement>('#btnOpenUrl')!;
   const bookmarkletLink = root.querySelector<HTMLAnchorElement>('#bookmarkletLink')!;
 
   function addPropRow(k = '', v = ''): void {
@@ -111,6 +113,18 @@ export function renderConfigure(root: HTMLElement): void {
     outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
+  btnOpenUrl.addEventListener('click', () => {
+    const url = useUrlInput.value;
+    if (!url) return;
+    if (isIOS()) {
+      // x-safari-https:// (and x-safari-http://) is an iOS URL scheme that forces
+      // the URL to open in Safari regardless of the current browser or standalone mode.
+      window.location.href = url.replace(/^(https?):\/\//, 'x-safari-$1://');
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  });
+
   btnCopyUrl.addEventListener('click', () => {
     navigator.clipboard.writeText(useUrlInput.value).then(() => {
       btnCopyUrl.textContent = 'Copied!';
@@ -123,4 +137,10 @@ export function renderConfigure(root: HTMLElement): void {
 
 function escAttr(str: string): string {
   return str.replace(/"/g, '&quot;');
+}
+
+/** Detect iOS — covers iPhone, iPad (including iPad reporting as MacIntel with touch). */
+function isIOS(): boolean {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
