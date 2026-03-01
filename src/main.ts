@@ -5,7 +5,9 @@ import { renderUse } from './views/use.js';
 const params = new URLSearchParams(window.location.search);
 const app = document.getElementById('app')!;
 
-if (params.get('v')) {
+if (params.get('mode') === 'configure') {
+  renderConfigure(app, params);
+} else if (params.get('v')) {
   renderUse(app, params);
 } else {
   renderConfigure(app);

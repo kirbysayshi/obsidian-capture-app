@@ -32,6 +32,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     metaTitle.content = config.name;
   }
 
+  // Generate a home screen icon from the emoji (or first letter of name) and
+  // set it as the apple-touch-icon so iOS picks it up on "Add to Home Screen"
+  generateHomeIcon(config.emoji, config.name);
+
   root.innerHTML = `
     <div class="use-view">
       <h1>
@@ -39,6 +43,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         ${config.canvas ? '<span class="canvas-badge">Canvas</span>' : ''}
       </h1>
       <p class="vault-info">→ ${config.vault}${config.folder ? ' / ' + config.folder : ''}</p>
+      <a class="configure-link" id="configureLink" href="#">Edit configuration</a>
 
       <div class="field">
         <label for="fieldWhat">What</label>
@@ -76,6 +81,13 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const contentPreview = root.querySelector<HTMLElement>('#contentPreview')!;
   const contentPreviewText = root.querySelector<HTMLElement>('#contentPreviewText')!;
   const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
+  const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink')!;
+
+  // Build configure URL: same params + mode=configure (drops mode=bm if present)
+  const configureParams = new URLSearchParams(params);
+  configureParams.delete('mode');
+  configureParams.set('mode', 'configure');
+  configureLink.href = `${window.location.pathname}?${configureParams}`;
 
   btnCancel.addEventListener('click', () => {
     if (isBookmarklet) {
@@ -220,4 +232,39 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 /** Return the first http(s) URL found in a string, or empty string. */
 function extractUrl(text: string): string {
   return text.match(/https?:\/\/\S+/)?.[0] ?? '';
+}
+
+/**
+ * Draw a 180×180 icon on an offscreen canvas and set it as the apple-touch-icon.
+ * Uses the emoji if provided, otherwise the first character of the name.
+ * iOS reads this link element at "Add to Home Screen" time.
+ */
+function generateHomeIcon(emoji: string, name: string): void {
+  const char = emoji || name.charAt(0) || '○';
+  const size = 180;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Background — match the app accent colour
+  ctx.fillStyle = '#7c6af5';
+  ctx.fillRect(0, 0, size, size);
+
+  // Character/emoji centred
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = emoji ? '110px sans-serif' : 'bold 96px sans-serif';
+  ctx.fillText(char, size / 2, size / 2);
+
+  let link = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'apple-touch-icon';
+    document.head.appendChild(link);
+  }
+  link.href = canvas.toDataURL('image/png');
 }

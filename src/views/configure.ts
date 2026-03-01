@@ -1,7 +1,7 @@
-import { encodeConfig, type Prop } from '../lib/config.js';
+import { encodeConfig, decodeConfig, type Prop } from '../lib/config.js';
 import { generateBookmarklet } from '../lib/bookmarklet.js';
 
-export function renderConfigure(root: HTMLElement): void {
+export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | null): void {
   root.innerHTML = `
     <div class="configure-view">
       <h1>Obsidian Capture</h1>
@@ -17,10 +17,13 @@ export function renderConfigure(root: HTMLElement): void {
         <input type="text" id="folder" placeholder="Inbox" autocomplete="off" spellcheck="false">
       </div>
 
-      <div class="field">
+      <div class="field shortcut-name-field">
         <label for="shortcutName">Shortcut / bookmarklet name</label>
-        <input type="text" id="shortcutName" placeholder="Capture to Obsidian" autocomplete="off">
-        <p class="field-hint">Shown as the bookmarklet label and the iOS home screen icon name.</p>
+        <div class="name-emoji-row">
+          <input type="text" id="shortcutEmoji" placeholder="📎" class="emoji-input" autocomplete="off" maxlength="2">
+          <input type="text" id="shortcutName" placeholder="Capture to Obsidian" autocomplete="off">
+        </div>
+        <p class="field-hint">Name shown as bookmarklet label and iOS home screen title. Emoji used as the home screen icon (leave blank to use the first letter).</p>
       </div>
 
       <div class="field">
@@ -30,9 +33,15 @@ export function renderConfigure(root: HTMLElement): void {
         </div>
       </div>
 
-      <h2>Custom frontmatter properties</h2>
-      <div class="props-list" id="propsList"></div>
-      <button class="secondary btn-add-prop" id="btnAddProp">+ Add property</button>
+      <div id="propsSection">
+        <h2>Custom frontmatter properties</h2>
+        <div class="props-list" id="propsList"></div>
+        <button class="secondary btn-add-prop" id="btnAddProp">+ Add property</button>
+      </div>
+
+      <p id="canvasPropsNote" class="canvas-props-note" style="display:none">
+        Canvas files don't support frontmatter — custom properties are only available in markdown mode.
+      </p>
 
       <button class="btn-generate" id="btnGenerate">Generate</button>
 
@@ -56,7 +65,7 @@ export function renderConfigure(root: HTMLElement): void {
         <div class="instructions">
           <ol>
             <li><strong>Desktop:</strong> Drag the bookmarklet link above to your browser toolbar.</li>
-            <li><strong>iPhone/iPad:</strong> Copy the Use URL, open it in Safari, tap Share → Add to Home Screen. The icon will be named as configured above.</li>
+            <li><strong>iPhone/iPad:</strong> Tap Open, then Share → Add to Home Screen. The icon and name will be set as configured above.</li>
             <li>On any page, click/tap the bookmark or shortcut to open the capture overlay.</li>
           </ol>
         </div>
@@ -64,6 +73,9 @@ export function renderConfigure(root: HTMLElement): void {
     </div>
   `;
 
+  const canvasCheckbox = root.querySelector<HTMLInputElement>('#canvas')!;
+  const propsSection = root.querySelector<HTMLElement>('#propsSection')!;
+  const canvasPropsNote = root.querySelector<HTMLElement>('#canvasPropsNote')!;
   const propsList = root.querySelector<HTMLElement>('#propsList')!;
   const btnAddProp = root.querySelector<HTMLButtonElement>('#btnAddProp')!;
   const btnGenerate = root.querySelector<HTMLButtonElement>('#btnGenerate')!;
@@ -72,6 +84,28 @@ export function renderConfigure(root: HTMLElement): void {
   const btnCopyUrl = root.querySelector<HTMLButtonElement>('#btnCopyUrl')!;
   const btnOpenUrl = root.querySelector<HTMLButtonElement>('#btnOpenUrl')!;
   const bookmarkletLink = root.querySelector<HTMLAnchorElement>('#bookmarkletLink')!;
+
+  // Pre-populate fields from URL params (when arriving from the use view's "Edit" link)
+  if (prefill) {
+    const cfg = decodeConfig(prefill);
+    if (cfg.vault) (root.querySelector<HTMLInputElement>('#vault')!).value = cfg.vault;
+    if (cfg.folder) (root.querySelector<HTMLInputElement>('#folder')!).value = cfg.folder;
+    if (cfg.name) (root.querySelector<HTMLInputElement>('#shortcutName')!).value = cfg.name;
+    if (cfg.emoji) (root.querySelector<HTMLInputElement>('#shortcutEmoji')!).value = cfg.emoji;
+    if (cfg.canvas) {
+      canvasCheckbox.checked = true;
+      propsSection.style.display = 'none';
+      canvasPropsNote.style.display = 'block';
+    }
+    cfg.props.forEach(p => addPropRow(p.k, p.v));
+  }
+
+  // Toggle frontmatter props visibility based on canvas mode
+  canvasCheckbox.addEventListener('change', () => {
+    const isCanvas = canvasCheckbox.checked;
+    propsSection.style.display = isCanvas ? 'none' : 'block';
+    canvasPropsNote.style.display = isCanvas ? 'block' : 'none';
+  });
 
   function addPropRow(k = '', v = ''): void {
     const row = document.createElement('div');
@@ -95,14 +129,15 @@ export function renderConfigure(root: HTMLElement): void {
     }
 
     const folder = root.querySelector<HTMLInputElement>('#folder')!.value.trim();
-    const canvas = root.querySelector<HTMLInputElement>('#canvas')!.checked;
+    const canvas = canvasCheckbox.checked;
     const name = root.querySelector<HTMLInputElement>('#shortcutName')!.value.trim();
-    const props: Prop[] = Array.from(propsList.querySelectorAll('.prop-row')).map(row => ({
+    const emoji = root.querySelector<HTMLInputElement>('#shortcutEmoji')!.value.trim();
+    const props: Prop[] = canvas ? [] : Array.from(propsList.querySelectorAll('.prop-row')).map(row => ({
       k: row.querySelector<HTMLInputElement>('.prop-key')!.value.trim(),
       v: row.querySelector<HTMLInputElement>('.prop-val')!.value.trim(),
     })).filter(p => p.k);
 
-    const params = encodeConfig({ vault, folder, canvas, name, props });
+    const params = encodeConfig({ vault, folder, canvas, name, emoji, props });
     const useUrl = `${window.location.origin}${window.location.pathname}?${params}`;
     const displayName = name || 'Capture to Obsidian';
 
@@ -117,8 +152,6 @@ export function renderConfigure(root: HTMLElement): void {
     const url = useUrlInput.value;
     if (!url) return;
     if (isIOS()) {
-      // x-safari-https:// (and x-safari-http://) is an iOS URL scheme that forces
-      // the URL to open in Safari regardless of the current browser or standalone mode.
       window.location.href = url.replace(/^(https?):\/\//, 'x-safari-$1://');
     } else {
       window.open(url, '_blank', 'noopener,noreferrer');

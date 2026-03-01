@@ -363,6 +363,18 @@ button.danger {
   margin-bottom: 20px;
 }
 
+.configure-link {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+
+.configure-link:hover {
+  color: var(--text);
+}
+
 .canvas-badge {
   display: inline-block;
   font-size: 0.75rem;
