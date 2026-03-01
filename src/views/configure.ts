@@ -174,6 +174,10 @@ function escAttr(str: string): string {
 
 /** Detect iOS — covers iPhone, iPad (including iPad reporting as MacIntel with touch). */
 function isIOS(): boolean {
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ reports as MacIntel; distinguish from desktop Firefox/Chrome via
+  // the Safari-only `standalone` property on navigator.
+  return navigator.platform === 'MacIntel'
+    && navigator.maxTouchPoints > 1
+    && 'standalone' in navigator;
 }
