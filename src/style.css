@@ -279,6 +279,35 @@ button.danger {
   margin-bottom: 4px;
 }
 
+/* ---- Update banner ---- */
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 10px 16px;
+}
+
+.update-banner .btn-refresh {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.4);
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.update-banner .btn-refresh:hover {
+  background: rgba(255,255,255,0.3);
+}
+
 /* ---- Use view ---- */
 
 .use-view {

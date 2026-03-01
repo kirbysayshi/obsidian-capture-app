@@ -3,6 +3,7 @@ import {
   buildObsidianUri,
   buildNoteContent,
   buildCanvasContent,
+  buildCanvasNoteText,
   makeSlug,
   makeTimestamp,
 } from '../lib/obsidian.js';
@@ -163,12 +164,12 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
     let content: string;
     if (config.canvas) {
-      // Always produce a canvas file; node type depends on whether we have a URL
-      const noteText = buildNoteContent({
+      // Always produce a canvas file; node type depends on whether we have a URL.
+      // Text nodes don't render frontmatter, so use plain markdown for them.
+      const noteText = buildCanvasNoteText({
         what,
         who,
         why,
-        props: config.props,
         bodyText: isBookmarklet ? extractedBodyText : '',
         url: extractedUrl,
       });
@@ -213,6 +214,30 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       }, 300);
     }
   });
+
+  checkForUpdate(root);
+}
+
+/**
+ * Fetch ./version.json (no-cache) and compare to the build-time constant.
+ * If they differ, prepend a refresh banner to root.
+ */
+async function checkForUpdate(root: HTMLElement): Promise<void> {
+  if (import.meta.env.DEV) return;
+  try {
+    const res = await fetch('./version.json', { cache: 'no-cache' });
+    if (!res.ok) return;
+    const { version } = await res.json() as { version: string };
+    if (version === __APP_VERSION__) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'update-banner';
+    banner.innerHTML = `<span>A new version is available.</span><button class="btn-refresh">Refresh</button>`;
+    banner.querySelector('.btn-refresh')!.addEventListener('click', () => location.reload());
+    root.prepend(banner);
+  } catch {
+    // Network unavailable — silently ignore
+  }
 }
 
 /** Return the first http(s) URL found in a string, or empty string. */
