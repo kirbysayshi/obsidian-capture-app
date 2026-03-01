@@ -46,6 +46,7 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       <button class="btn-generate" id="btnGenerate">Generate</button>
 
       <div id="outputSection" style="display:none" class="output-section">
+        <p id="staleNotice" class="stale-notice" style="display:none">⚠ Settings changed — click Generate to update.</p>
         <h2>Your links</h2>
 
         <div class="output-block">
@@ -84,6 +85,35 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   const btnCopyUrl = root.querySelector<HTMLButtonElement>('#btnCopyUrl')!;
   const btnOpenUrl = root.querySelector<HTMLButtonElement>('#btnOpenUrl')!;
   const bookmarkletLink = root.querySelector<HTMLAnchorElement>('#bookmarkletLink')!;
+  const staleNotice = root.querySelector<HTMLElement>('#staleNotice')!;
+  let lastGeneratedSnapshot = '';
+
+  function readCurrentConfig() {
+    const vault = root.querySelector<HTMLInputElement>('#vault')!.value.trim();
+    const folder = root.querySelector<HTMLInputElement>('#folder')!.value.trim();
+    const canvas = canvasCheckbox.checked;
+    const name = root.querySelector<HTMLInputElement>('#shortcutName')!.value.trim();
+    const emoji = root.querySelector<HTMLInputElement>('#shortcutEmoji')!.value.trim();
+    const props: Prop[] = canvas ? [] : Array.from(propsList.querySelectorAll('.prop-row')).map(row => ({
+      k: row.querySelector<HTMLInputElement>('.prop-key')!.value.trim(),
+      v: row.querySelector<HTMLInputElement>('.prop-val')!.value.trim(),
+    })).filter(p => p.k);
+    return { vault, folder, canvas, name, emoji, props };
+  }
+
+  function updateStaleNotice(): void {
+    if (outputSection.style.display === 'none') return;
+    const current = encodeConfig(readCurrentConfig()).toString();
+    staleNotice.style.display = current === lastGeneratedSnapshot ? 'none' : 'block';
+  }
+
+  // Any input/change outside the output section (form fields, checkbox, props) re-evaluates staleness
+  root.addEventListener('input', (e) => {
+    if (!(e.target as HTMLElement).closest('#outputSection')) updateStaleNotice();
+  });
+  root.addEventListener('change', (e) => {
+    if (!(e.target as HTMLElement).closest('#outputSection')) updateStaleNotice();
+  });
 
   // Pre-populate fields from URL params (when arriving from the use view's "Edit" link)
   if (prefill) {
@@ -115,35 +145,34 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       <input type="text" placeholder="value" value="${escAttr(v)}" class="prop-val" spellcheck="false">
       <button class="danger btn-remove-prop">✕</button>
     `;
-    row.querySelector<HTMLButtonElement>('.btn-remove-prop')!.addEventListener('click', () => row.remove());
+    row.querySelector<HTMLButtonElement>('.btn-remove-prop')!.addEventListener('click', () => {
+      row.remove();
+      updateStaleNotice();
+    });
     propsList.appendChild(row);
   }
 
-  btnAddProp.addEventListener('click', () => addPropRow());
+  btnAddProp.addEventListener('click', () => {
+    addPropRow();
+    updateStaleNotice();
+  });
 
   btnGenerate.addEventListener('click', () => {
-    const vault = root.querySelector<HTMLInputElement>('#vault')!.value.trim();
-    if (!vault) {
+    const cfg = readCurrentConfig();
+    if (!cfg.vault) {
       root.querySelector<HTMLInputElement>('#vault')!.focus();
       return;
     }
 
-    const folder = root.querySelector<HTMLInputElement>('#folder')!.value.trim();
-    const canvas = canvasCheckbox.checked;
-    const name = root.querySelector<HTMLInputElement>('#shortcutName')!.value.trim();
-    const emoji = root.querySelector<HTMLInputElement>('#shortcutEmoji')!.value.trim();
-    const props: Prop[] = canvas ? [] : Array.from(propsList.querySelectorAll('.prop-row')).map(row => ({
-      k: row.querySelector<HTMLInputElement>('.prop-key')!.value.trim(),
-      v: row.querySelector<HTMLInputElement>('.prop-val')!.value.trim(),
-    })).filter(p => p.k);
-
-    const params = encodeConfig({ vault, folder, canvas, name, emoji, props });
+    const params = encodeConfig(cfg);
     const useUrl = `${window.location.origin}${window.location.pathname}?${params}`;
-    const displayName = name || 'Capture to Obsidian';
+    const displayName = cfg.name || 'Capture to Obsidian';
 
+    lastGeneratedSnapshot = params.toString();
     useUrlInput.value = useUrl;
     bookmarkletLink.href = generateBookmarklet(useUrl);
     bookmarkletLink.textContent = `⚡ ${displayName}`;
+    staleNotice.style.display = 'none';
     outputSection.style.display = 'block';
     outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });

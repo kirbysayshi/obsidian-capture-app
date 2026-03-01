@@ -241,6 +241,16 @@ button.danger {
   font-size: 1.1rem;
 }
 
+/* Stale notice */
+.stale-notice {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  margin-top: 0;
+}
+
 /* Output section */
 .output-section {
   margin-top: 28px;

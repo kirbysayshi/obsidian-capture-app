@@ -10,6 +10,8 @@ export interface Config {
   props: Prop[];
   /** Custom name for the bookmarklet link and iOS home screen shortcut */
   name: string;
+  /** Emoji character used as the iOS home screen icon */
+  emoji: string;
 }
 
 /**
@@ -21,6 +23,7 @@ export function encodeConfig(config: Config): URLSearchParams {
   if (config.folder) params.set('f', config.folder);
   if (config.canvas) params.set('canvas', '1');
   if (config.name) params.set('n', config.name);
+  if (config.emoji) params.set('e', config.emoji);
   if (config.props.length > 0) {
     params.set('props', btoa(JSON.stringify(config.props)));
   }
@@ -35,6 +38,7 @@ export function decodeConfig(params: URLSearchParams): Config {
   const folder = params.get('f') ?? '';
   const canvas = params.get('canvas') === '1';
   const name = params.get('n') ?? '';
+  const emoji = params.get('e') ?? '';
   let props: Prop[] = [];
   const propsRaw = params.get('props');
   if (propsRaw) {
@@ -44,5 +48,5 @@ export function decodeConfig(params: URLSearchParams): Config {
       props = [];
     }
   }
-  return { vault, folder, canvas, name, props };
+  return { vault, folder, canvas, name, emoji, props };
 }
