@@ -10,3 +10,38 @@ if (params.get('v')) {
 } else {
   renderConfigure(app);
 }
+
+checkForUpdate(app);
+
+/**
+ * Fetch ./version.json and compare to the build-time constant.
+ * If they differ, prepend a refresh banner (at most once).
+ * Re-checks whenever the page becomes visible again.
+ */
+function checkForUpdate(root: HTMLElement): void {
+  if (import.meta.env.DEV) return;
+
+  async function check(): Promise<void> {
+    if (root.querySelector('.update-banner')) return;
+    try {
+      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-cache' });
+      if (!res.ok) return;
+      const { version } = await res.json() as { version: string };
+      if (version === __APP_VERSION__) return;
+
+      const banner = document.createElement('div');
+      banner.className = 'update-banner';
+      banner.innerHTML = `<span>A new version is available.</span><button class="btn-refresh">Refresh</button>`;
+      banner.querySelector('.btn-refresh')!.addEventListener('click', () => location.reload());
+      root.prepend(banner);
+    } catch {
+      // Network unavailable — silently ignore
+    }
+  }
+
+  check();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
+}
