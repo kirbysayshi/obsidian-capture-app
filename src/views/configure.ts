@@ -94,10 +94,14 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     const canvas = canvasCheckbox.checked;
     const name = root.querySelector<HTMLInputElement>('#shortcutName')!.value.trim();
     const emoji = root.querySelector<HTMLInputElement>('#shortcutEmoji')!.value.trim();
-    const props: Prop[] = canvas ? [] : Array.from(propsList.querySelectorAll('.prop-row')).map(row => ({
-      k: row.querySelector<HTMLInputElement>('.prop-key')!.value.trim(),
-      v: row.querySelector<HTMLInputElement>('.prop-val')!.value.trim(),
-    })).filter(p => p.k);
+    const props: Prop[] = canvas ? [] : Array.from(propsList.querySelectorAll<HTMLElement>('.prop-row')).map(row => {
+      const k = row.querySelector<HTMLInputElement>('.prop-key')!.value.trim();
+      const type = (row.dataset.propType || 'text') as Prop['type'];
+      const v = type === 'boolean'
+        ? (row.querySelector<HTMLInputElement>('.prop-bool-check')!.checked ? 'true' : 'false')
+        : row.querySelector<HTMLInputElement>('.prop-val')!.value.trim();
+      return { k, v, type };
+    }).filter(p => p.k);
     return { vault, folder, canvas, name, emoji, props };
   }
 
@@ -127,7 +131,7 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       propsSection.style.display = 'none';
       canvasPropsNote.style.display = 'block';
     }
-    cfg.props.forEach(p => addPropRow(p.k, p.v));
+    cfg.props.forEach(p => addPropRow(p.k, p.v, p.type));
   }
 
   // Toggle frontmatter props visibility based on canvas mode
@@ -137,14 +141,43 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     canvasPropsNote.style.display = isCanvas ? 'block' : 'none';
   });
 
-  function addPropRow(k = '', v = ''): void {
+  function addPropRow(k = '', v = '', type: Prop['type'] = 'text'): void {
     const row = document.createElement('div');
     row.className = 'prop-row';
+    row.dataset.propType = type ?? 'text';
     row.innerHTML = `
+      <button class="prop-type-icon" type="button">≡</button>
       <input type="text" placeholder="key" value="${escAttr(k)}" class="prop-key" spellcheck="false">
       <input type="text" placeholder="value" value="${escAttr(v)}" class="prop-val" spellcheck="false">
+      <label class="prop-bool-default">
+        <input type="checkbox" class="prop-bool-check">
+        <span>default</span>
+      </label>
       <button class="danger btn-remove-prop">✕</button>
     `;
+
+    const typeIcon = row.querySelector<HTMLButtonElement>('.prop-type-icon')!;
+    const valInput = row.querySelector<HTMLInputElement>('.prop-val')!;
+    const boolDefault = row.querySelector<HTMLElement>('.prop-bool-default')!;
+    const boolCheck = row.querySelector<HTMLInputElement>('.prop-bool-check')!;
+
+    function applyType(t: Prop['type']): void {
+      row.dataset.propType = t;
+      const isBool = t === 'boolean';
+      typeIcon.textContent = isBool ? '☑' : '≡';
+      typeIcon.title = isBool ? 'Switch to text' : 'Switch to boolean';
+      valInput.style.display = isBool ? 'none' : '';
+      boolDefault.style.display = isBool ? '' : 'none';
+    }
+
+    if (v === 'true') boolCheck.checked = true;
+    applyType(type ?? 'text');
+
+    typeIcon.addEventListener('click', () => {
+      applyType(row.dataset.propType === 'boolean' ? 'text' : 'boolean');
+      updateStaleNotice();
+    });
+    boolCheck.addEventListener('change', updateStaleNotice);
     row.querySelector<HTMLButtonElement>('.btn-remove-prop')!.addEventListener('click', () => {
       row.remove();
       updateStaleNotice();

@@ -233,6 +233,47 @@ button.danger {
   font-size: 0.9rem;
 }
 
+.prop-type-icon {
+  flex: 0 0 28px;
+  min-height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.prop-type-icon:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+.prop-bool-default {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.prop-bool-default input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* Generate button */
 .btn-generate {
   width: 100%;

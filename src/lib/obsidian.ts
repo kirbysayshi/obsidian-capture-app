@@ -72,8 +72,13 @@ export function buildNoteContent({
   lines.push(`created: ${created}`);
   lines.push(`what: "${escapeFrontmatter(what)}"`);
   if (who) lines.push(`who: "${escapeFrontmatter(who)}"`);
-  for (const { k, v } of props) {
-    if (k) lines.push(`${k}: "${escapeFrontmatter(v)}"`);
+  for (const { k, v, type } of props) {
+    if (!k) continue;
+    if (type === 'boolean') {
+      lines.push(`${k}: ${v === 'true' ? 'true' : 'false'}`);
+    } else {
+      lines.push(`${k}: "${escapeFrontmatter(v)}"`);
+    }
   }
   if (why) lines.push(`why: "${escapeFrontmatter(why)}"`);
   lines.push('---');

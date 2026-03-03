@@ -61,6 +61,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         <textarea id="fieldWhy" placeholder="Why does this matter?" rows="3"></textarea>
       </div>
 
+      <div id="boolPropsSection"></div>
+
       <div class="btn-row">
         <button class="btn-save" id="btnSave">Save to Obsidian</button>
         <button class="btn-cancel secondary" id="btnCancel">Cancel</button>
@@ -82,6 +84,21 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const contentPreviewText = root.querySelector<HTMLElement>('#contentPreviewText')!;
   const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
   const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink')!;
+  const boolPropsSection = root.querySelector<HTMLElement>('#boolPropsSection')!;
+
+  // Render boolean props as checkboxes
+  const booleanProps = config.props.filter(p => p.type === 'boolean');
+  for (const prop of booleanProps) {
+    const field = document.createElement('div');
+    field.className = 'field';
+    field.innerHTML = `
+      <label class="checkbox-row">
+        <input type="checkbox" class="bool-prop-checkbox" data-key="${escProp(prop.k)}"${prop.v === 'true' ? ' checked' : ''}>
+        <span>${prop.k}</span>
+      </label>
+    `;
+    boolPropsSection.appendChild(field);
+  }
 
   // Build configure URL: same params + mode=configure (drops mode=bm if present)
   const configureParams = new URLSearchParams(params);
@@ -174,6 +191,13 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     // For a link node, prefer the bookmarklet-captured URL then scan the what field
     const canvasUrl = extractedUrl || extractUrl(what);
 
+    // Resolve boolean prop values from checkboxes; text props pass through unchanged
+    const resolvedProps = config.props.map(prop => {
+      if (prop.type !== 'boolean') return prop;
+      const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
+      return { ...prop, v: cb?.checked ? 'true' : 'false' };
+    });
+
     let content: string;
     if (config.canvas) {
       // Always produce a canvas file; node type depends on whether we have a URL.
@@ -191,7 +215,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         what,
         who,
         why,
-        props: config.props,
+        props: resolvedProps,
         bodyText: isBookmarklet ? extractedBodyText : '',
         url: extractedUrl,
       });
@@ -227,6 +251,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     }
   });
 
+}
+
+/** Escape a string for use in an HTML attribute value. */
+function escProp(str: string): string {
+  return str.replace(/"/g, '&quot;');
 }
 
 /** Return the first http(s) URL found in a string, or empty string. */

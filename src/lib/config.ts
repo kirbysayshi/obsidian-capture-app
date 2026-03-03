@@ -1,6 +1,7 @@
 export interface Prop {
   k: string;
   v: string;
+  type?: 'text' | 'boolean';
 }
 
 export interface Config {

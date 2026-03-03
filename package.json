@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "pnpm build && gh-pages -d dist",
-    "test": "node test/smoke.mjs"
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0"
@@ -15,7 +16,7 @@
   "devDependencies": {
     "vite": "7.3.1",
     "gh-pages": "6.3.0",
-    "playwright": "1.50.1"
+    "@playwright/test": "1.50.1"
   },
   "keywords": [],
   "author": "",
