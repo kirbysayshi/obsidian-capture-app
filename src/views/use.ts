@@ -158,6 +158,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           if (channelLine) parts.push(`**Channel:** ${channelLine}`);
           if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
           extractedBodyText = parts.join('\n\n');
+        } else {
+          extractedBodyText = '⚠️ Could not extract YouTube metadata — YouTube may have changed their page format.';
         }
       } else {
         const article = extractContent(data.html, data.url);

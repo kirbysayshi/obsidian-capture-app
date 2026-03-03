@@ -36,23 +36,16 @@ export function isYouTubeVideo(url: string): boolean {
 /**
  * Extract structured content from a YouTube watch page.
  *
- * Strategy:
- *   1. Parse ytInitialData from the page's embedded <script> tag — this contains
- *      the full, untruncated description before the "…more" button hides it.
- *   2. Fall back to DOM selectors if the JSON parse fails.
+ * Parses the ytInitialData JSON blob embedded in the page's <script> tags.
+ * Returns null if the JSON cannot be found or parsed — this likely means
+ * YouTube has changed their data model.
  */
 export function extractYouTubeContent(html: string): YouTubeContent | null {
   try {
     const doc = new DOMParser().parseFromString(html, 'text/html');
-
     const ytData = parseYtInitialData(doc);
-    if (ytData) {
-      const result = extractFromYtData(ytData);
-      if (result) return result;
-    }
-
-    // Fallback: targeted DOM selectors
-    return extractFromDom(doc);
+    if (!ytData) return null;
+    return extractFromYtData(ytData);
   } catch {
     return null;
   }
@@ -220,49 +213,6 @@ function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null
   return { title, channel, subs, description: normalizeText(description) };
 }
 
-/**
- * Fallback: extract what we can from the rendered DOM using targeted selectors.
- * Avoids the recommendations panel entirely. Covers both desktop (ytd-*) and
- * mobile (ytm-*) custom elements.
- */
-function extractFromDom(doc: Document): YouTubeContent | null {
-  const title = queryText(doc,
-    // Desktop
-    'ytd-watch-metadata h1 yt-formatted-string',
-    'ytd-video-primary-info-renderer h1 yt-formatted-string',
-    '#video-title',
-    // Mobile
-    'ytm-slim-video-metadata-renderer h2',
-    '.slim-video-information-title',
-  );
-  const channel = queryText(doc,
-    // Desktop
-    'ytd-video-owner-renderer ytd-channel-name yt-formatted-string',
-    '#channel-name yt-formatted-string',
-    '#owner-name a',
-    // Mobile
-    'ytm-slim-owner-renderer .slim-owner-channel-name',
-    '.slim-owner-channel-name',
-  );
-  const subs = queryText(doc,
-    '#owner-sub-count',
-    '.slim-owner-subccount',
-  );
-  const rawDesc = queryText(doc,
-    // Desktop
-    'ytd-expandable-video-description-body-renderer yt-attributed-string',
-    '#attributed-snippet-text',
-    'ytd-video-description-header-renderer yt-formatted-string#snippet-text',
-    '#description-text',
-    // Mobile
-    'ytm-expandable-video-description-body-renderer',
-    '.snippet-text',
-  );
-
-  if (!title && !channel && !rawDesc) return null;
-  return { title, channel, subs, description: normalizeText(rawDesc) };
-}
-
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /** Safely navigate a deeply nested unknown structure. */
@@ -293,15 +243,6 @@ function runsText(runs: unknown): string {
   return asArr(runs)
     .map(r => asStr(dig(r, 'text')))
     .join('');
-}
-
-/** Try each selector in order; return the first non-empty textContent. */
-function queryText(doc: Document, ...selectors: string[]): string {
-  for (const sel of selectors) {
-    const text = doc.querySelector(sel)?.textContent?.trim();
-    if (text) return text;
-  }
-  return '';
 }
 
 /**
