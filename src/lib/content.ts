@@ -36,14 +36,14 @@ export function isYouTubeVideo(url: string): boolean {
 /**
  * Extract structured content from a YouTube watch page.
  *
- * Parses the ytInitialData JSON blob embedded in the page's <script> tags.
+ * Finds the ytInitialData JSON blob directly in the HTML string (no DOMParser),
+ * then navigates the data structure to pull out title/channel/description.
  * Returns null if the JSON cannot be found or parsed — this likely means
  * YouTube has changed their data model.
  */
 export function extractYouTubeContent(html: string): YouTubeContent | null {
   try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const ytData = parseYtInitialData(doc);
+    const ytData = parseYtInitialData(html);
     if (!ytData) return null;
     return extractFromYtData(ytData);
   } catch {
@@ -80,49 +80,29 @@ export function extractContent(html: string, url: string): ArticleContent | null
 // ─── ytInitialData parsing ────────────────────────────────────────────────────
 
 /**
- * Find and parse the ytInitialData JSON blob from a YouTube page's script tags.
+ * Find and parse the ytInitialData JSON blob directly from the HTML string.
  *
  * YouTube embeds the full page data as:
  *   <script>var ytInitialData = {...};</script>
  *
- * We locate the opening brace and scan forward with a string-aware brace
- * counter to find the exact end of the JSON object, then JSON.parse it.
+ * We locate the marker string, then slice to the closing </script> tag to get
+ * the JSON — no DOMParser or brace-counting needed.
  */
-function parseYtInitialData(doc: Document): Record<string, unknown> | null {
-  for (const script of doc.querySelectorAll('script')) {
-    const text = script.textContent ?? '';
-    if (!text.includes('ytInitialData')) continue;
+function parseYtInitialData(html: string): Record<string, unknown> | null {
+  const MARKER = 'var ytInitialData = ';
+  const markerIdx = html.indexOf(MARKER);
+  if (markerIdx === -1) return null;
 
-    const jsonStart = text.indexOf('{');
-    if (jsonStart === -1) continue;
+  const jsonStart = markerIdx + MARKER.length;
+  const scriptEnd = html.indexOf('</script>', jsonStart);
+  if (scriptEnd === -1) return null;
 
-    // String-aware brace counter so we don't mis-count braces inside strings
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    let jsonEnd = -1;
-
-    for (let i = jsonStart; i < text.length; i++) {
-      const ch = text[i];
-      if (escape) { escape = false; continue; }
-      if (ch === '\\' && inString) { escape = true; continue; }
-      if (ch === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}') {
-        depth--;
-        if (depth === 0) { jsonEnd = i; break; }
-      }
-    }
-
-    if (jsonEnd === -1) continue;
-    try {
-      return JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as Record<string, unknown>;
-    } catch {
-      continue;
-    }
+  const jsonStr = html.slice(jsonStart, scriptEnd).trim().replace(/;$/, '').trim();
+  try {
+    return JSON.parse(jsonStr) as Record<string, unknown>;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 /**

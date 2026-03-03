@@ -173,6 +173,44 @@ test.describe('Use view', () => {
   });
 });
 
+// ── YouTube metadata extraction ───────────────────────────────────────────────
+
+test.describe('YouTube metadata extraction', () => {
+  test('extracts title, channel, and description from fixture HTML', async () => {
+    const { readFileSync } = await import('fs');
+    const html = readFileSync('test/fixtures/youtube-rosalia.html', 'utf-8');
+
+    // Mirror parseYtInitialData — pure string + JSON.parse, no DOMParser
+    const MARKER = 'var ytInitialData = ';
+    const markerIdx = html.indexOf(MARKER);
+    expect(markerIdx).toBeGreaterThan(-1);
+
+    const jsonStart = markerIdx + MARKER.length;
+    const scriptEnd = html.indexOf('</script>', jsonStart);
+    expect(scriptEnd).toBeGreaterThan(-1);
+
+    const data = JSON.parse(html.slice(jsonStart, scriptEnd).trim().replace(/;$/, '').trim());
+
+    const contents = data?.contents?.twoColumnWatchNextResults?.results?.results?.contents ?? [];
+    let title = '', channel = '', description = '';
+    for (const item of contents) {
+      if (item.videoPrimaryInfoRenderer) {
+        title = (item.videoPrimaryInfoRenderer.title.runs ?? []).map(r => r.text).join('');
+      }
+      if (item.videoSecondaryInfoRenderer) {
+        const vsir = item.videoSecondaryInfoRenderer;
+        description = vsir.attributedDescription?.content ?? '';
+        const owner = vsir.owner?.videoOwnerRenderer;
+        channel = (owner?.title?.runs ?? []).map(r => r.text).join('');
+      }
+    }
+
+    expect(title).toBe('ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk');
+    expect(channel).toBe('ROSALÍA');
+    expect(description).toContain('Berghain');
+  });
+});
+
 // ── Edit configuration prefill ────────────────────────────────────────────────
 
 test.describe('Edit configuration prefill', () => {
