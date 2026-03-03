@@ -204,7 +204,7 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     lastGeneratedSnapshot = params.toString();
     useUrlInput.value = useUrl;
     bookmarkletLink.href = generateBookmarklet(useUrl);
-    bookmarkletLink.textContent = `⚡ ${displayName}`;
+    bookmarkletLink.textContent = `${cfg.emoji || '⚡'} ${displayName}`;
     staleNotice.style.display = 'none';
     outputSection.style.display = 'block';
     outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
