@@ -106,17 +106,35 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   configureParams.set('mode', 'configure');
   configureLink.href = `${window.location.pathname}?${configureParams}`;
 
+  let extractedUrl = '';
+  let extractedBodyText = '';  // title + body combined, goes into note body
+  let extractedTitle = '';     // used for filename slug
+
+  function resetForm(): void {
+    fieldWhat.value = '';
+    fieldWho.value = '';
+    fieldWhy.value = '';
+    extractedUrl = '';
+    extractedBodyText = '';
+    extractedTitle = '';
+    contentPreview.style.display = 'none';
+    contentPreviewText.textContent = '';
+    // Reset boolean prop checkboxes to their configured defaults
+    for (const prop of booleanProps) {
+      const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
+      if (cb) cb.checked = prop.v === 'true';
+    }
+  }
+
   btnCancel.addEventListener('click', () => {
     if (isBookmarklet) {
       window.parent.postMessage({ type: 'close' }, '*');
+    } else if (isStandalone()) {
+      resetForm();
     } else {
       window.history.back();
     }
   });
-
-  let extractedUrl = '';
-  let extractedBodyText = '';  // title + body combined, goes into note body
-  let extractedTitle = '';     // used for filename slug
 
   if (isBookmarklet) {
     // Request page content from the parent bookmarklet overlay
@@ -232,16 +250,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
     // The obsidian:// scheme doesn't navigate away from the page, so reset the
     // form so it's blank if the user returns (especially from the home screen).
-    setTimeout(() => {
-      fieldWhat.value = '';
-      fieldWho.value = '';
-      fieldWhy.value = '';
-      extractedUrl = '';
-      extractedBodyText = '';
-      extractedTitle = '';
-      contentPreview.style.display = 'none';
-      contentPreviewText.textContent = '';
-    }, 500);
+    setTimeout(resetForm, 500);
 
     if (isBookmarklet) {
       // Give the URI a moment to register before signaling close
@@ -251,6 +260,12 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     }
   });
 
+}
+
+/** Detect iOS/PWA standalone mode (launched from home screen). */
+function isStandalone(): boolean {
+  return (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
 }
 
 /** Escape a string for use in an HTML attribute value. */
