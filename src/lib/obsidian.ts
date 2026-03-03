@@ -26,35 +26,35 @@ export function buildObsidianUri({ vault, folder, filename, content }: ObsidianU
 }
 
 /**
- * Generate a filename slug from a title string.
- * Max 40 chars, lowercased, spaces/special chars → hyphens.
+ * Generate a human-readable filename slug from a title.
+ * Strips characters invalid in filenames, preserves casing and spaces.
+ * Max 60 chars.
  */
-export function makeSlug(title: string): string {
+export function makeReadableSlug(title: string): string {
   return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
     .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 40)
-    .replace(/-$/, '');
+    .slice(0, 60)
+    .trim();
 }
 
 /**
- * Generate a timestamp string. Format: YYYYMMDDTHHmmss
+ * Generate a human-readable timestamp. Format: YYYY-MM-DD HH.mm
+ * Dots separate hours and minutes to keep it valid in all OS filenames.
  */
-export function makeTimestamp(date: Date = new Date()): string {
+export function makeHumanTimestamp(date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
-    String(date.getFullYear()) +
-    pad(date.getMonth() + 1) +
-    pad(date.getDate()) +
-    'T' +
-    pad(date.getHours()) +
-    pad(date.getMinutes()) +
-    pad(date.getSeconds())
+    String(date.getFullYear()) + '-' +
+    pad(date.getMonth() + 1) + '-' +
+    pad(date.getDate()) + ' ' +
+    pad(date.getHours()) + '.' +
+    pad(date.getMinutes())
   );
 }
+
+const RESERVED_PROP_KEYS = new Set(['created', 'what', 'who', 'why']);
 
 /**
  * Build the full note content (markdown frontmatter + body).
@@ -73,7 +73,7 @@ export function buildNoteContent({
   lines.push(`what: "${escapeFrontmatter(what)}"`);
   if (who) lines.push(`who: "${escapeFrontmatter(who)}"`);
   for (const { k, v, type } of props) {
-    if (!k) continue;
+    if (!k || RESERVED_PROP_KEYS.has(k)) continue;
     if (type === 'boolean') {
       lines.push(`${k}: ${v === 'true' ? 'true' : 'false'}`);
     } else {
@@ -105,6 +105,7 @@ export function buildCanvasNoteText({
   url = '',
 }: NoteContentParams): string {
   const lines: string[] = [];
+  lines.push(`**Created:** ${makeHumanTimestamp()}`);
   if (what) lines.push(`**What:** ${what}`);
   if (who)  lines.push(`**Who:** ${who}`);
   if (why)  lines.push(`**Why:** ${why}`);

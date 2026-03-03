@@ -4,8 +4,8 @@ import {
   buildNoteContent,
   buildCanvasContent,
   buildCanvasNoteText,
-  makeSlug,
-  makeTimestamp,
+  makeReadableSlug,
+  makeHumanTimestamp,
 } from '../lib/obsidian.js';
 import { extractContent, extractYouTubeContent, isYouTubeVideo } from '../lib/content.js';
 
@@ -200,11 +200,16 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
     // In bookmarklet mode use the article title for the slug; otherwise use first line of what
     const slugSource = isBookmarklet && extractedTitle ? extractedTitle : what.split('\n')[0] ?? 'capture';
-    const slug = makeSlug(slugSource) || 'capture';
-    const ts = makeTimestamp();
+    const slug = makeReadableSlug(slugSource) || 'capture';
 
-    const ext = config.canvas ? '.canvas' : '.md';
-    const filename = `${ts}-${slug}${ext}`;
+    let filename: string;
+    if (config.canvas) {
+      // Canvas filenames: no timestamp, just the slug
+      filename = `${slug}.canvas`;
+    } else {
+      const ts = makeHumanTimestamp();
+      filename = `${ts} ${slug}.md`;
+    }
 
     // For a link node, prefer the bookmarklet-captured URL then scan the what field
     const canvasUrl = extractedUrl || extractUrl(what);

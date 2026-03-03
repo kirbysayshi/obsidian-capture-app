@@ -138,11 +138,19 @@ function parseYtInitialData(doc: Document): Record<string, unknown> | null {
  * YouTube stores the description as an array of "runs" — plain-text segments
  * and hyperlinks — inside videoSecondaryInfoRenderer. Concatenating run.text
  * gives the complete, untruncated description.
+ *
+ * Desktop uses twoColumnWatchNextResults; mobile uses singleColumnWatchNextResults.
  */
 function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null {
-  // The main content lives under this path in twoColumnWatchNextResults
-  const contents = asArr(
+  // Desktop layout
+  const desktopContents = asArr(
     dig(data, 'contents', 'twoColumnWatchNextResults', 'results', 'results', 'contents'),
+  );
+
+  // Mobile layout: singleColumnWatchNextResults → results → contents → slimVideoMetadataRenderer, etc.
+  // The video info is nested inside slimVideoMetadataRenderer and slimOwnerRenderer.
+  const mobileItems = asArr(
+    dig(data, 'contents', 'singleColumnWatchNextResults', 'results', 'results', 'contents'),
   );
 
   let title = '';
@@ -150,20 +158,17 @@ function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null
   let subs = '';
   let description = '';
 
-  for (const item of contents) {
-    // videoPrimaryInfoRenderer → title
+  // Try desktop path first
+  for (const item of desktopContents) {
     const vpir = dig(item, 'videoPrimaryInfoRenderer');
     if (vpir) {
       title = runsText(dig(vpir, 'title', 'runs'));
     }
 
-    // videoSecondaryInfoRenderer → description + channel
     const vsir = dig(item, 'videoSecondaryInfoRenderer');
     if (vsir) {
-      // Full description via runs (untruncated)
       description =
         runsText(dig(vsir, 'description', 'runs')) ||
-        // Newer format: attributedDescription.content is a plain string
         asStr(dig(vsir, 'attributedDescription', 'content'));
 
       const owner = dig(vsir, 'owner', 'videoOwnerRenderer');
@@ -176,31 +181,82 @@ function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null
     }
   }
 
+  // Try mobile path if desktop came up empty
+  if (!title && !description) {
+    for (const item of mobileItems) {
+      const svmr = dig(item, 'slimVideoMetadataRenderer');
+      if (svmr) {
+        title = runsText(dig(svmr, 'title', 'runs'));
+        description =
+          runsText(dig(svmr, 'description', 'runs')) ||
+          asStr(dig(svmr, 'description', 'simpleText'));
+      }
+
+      const sor = dig(item, 'slimOwnerRenderer');
+      if (sor) {
+        channel = runsText(dig(sor, 'title', 'runs'));
+        subs =
+          asStr(dig(sor, 'collapsedSubtitle', 'simpleText')) ||
+          runsText(dig(sor, 'collapsedSubtitle', 'runs'));
+      }
+
+      // Also try engagementPanels path for description on newer mobile layouts
+      const epvmr = dig(item, 'engagementPanelSectionListRenderer',
+        'content', 'structuredDescriptionContentRenderer',
+        'items');
+      if (epvmr && !description) {
+        for (const ep of asArr(epvmr)) {
+          const snippet = dig(ep, 'videoDescriptionHeaderRenderer', 'description', 'content');
+          if (typeof snippet === 'string' && snippet) {
+            description = snippet;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   if (!title && !description) return null;
   return { title, channel, subs, description: normalizeText(description) };
 }
 
 /**
  * Fallback: extract what we can from the rendered DOM using targeted selectors.
- * Avoids the recommendations panel entirely.
+ * Avoids the recommendations panel entirely. Covers both desktop (ytd-*) and
+ * mobile (ytm-*) custom elements.
  */
 function extractFromDom(doc: Document): YouTubeContent | null {
   const title = queryText(doc,
+    // Desktop
     'ytd-watch-metadata h1 yt-formatted-string',
     'ytd-video-primary-info-renderer h1 yt-formatted-string',
     '#video-title',
+    // Mobile
+    'ytm-slim-video-metadata-renderer h2',
+    '.slim-video-information-title',
   );
   const channel = queryText(doc,
+    // Desktop
     'ytd-video-owner-renderer ytd-channel-name yt-formatted-string',
     '#channel-name yt-formatted-string',
     '#owner-name a',
+    // Mobile
+    'ytm-slim-owner-renderer .slim-owner-channel-name',
+    '.slim-owner-channel-name',
   );
-  const subs = queryText(doc, '#owner-sub-count');
+  const subs = queryText(doc,
+    '#owner-sub-count',
+    '.slim-owner-subccount',
+  );
   const rawDesc = queryText(doc,
+    // Desktop
     'ytd-expandable-video-description-body-renderer yt-attributed-string',
     '#attributed-snippet-text',
     'ytd-video-description-header-renderer yt-formatted-string#snippet-text',
     '#description-text',
+    // Mobile
+    'ytm-expandable-video-description-body-renderer',
+    '.snippet-text',
   );
 
   if (!title && !channel && !rawDesc) return null;
