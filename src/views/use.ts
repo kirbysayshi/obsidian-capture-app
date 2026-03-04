@@ -72,6 +72,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         <label>Clipped content</label>
         <pre id="contentPreviewText"></pre>
       </div>
+
+      <details id="debugDetails" class="debug-details">
+        <summary>Debug</summary>
+        <pre id="debugLog"></pre>
+      </details>
     </div>
   `;
 
@@ -85,6 +90,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
   const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink')!;
   const boolPropsSection = root.querySelector<HTMLElement>('#boolPropsSection')!;
+  const debugLog = root.querySelector<HTMLElement>('#debugLog')!;
+
+  function dbg(...lines: string[]): void {
+    debugLog.textContent += lines.join('\n') + '\n';
+  }
 
   // Render boolean props as checkboxes
   const booleanProps = config.props.filter(p => p.type === 'boolean');
@@ -146,9 +156,12 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       window.removeEventListener('message', handleMessage);
 
       extractedUrl = data.url ?? '';
+      dbg(`url: ${data.url}`, `html.length: ${data.html?.length ?? 'undefined'}`, `isYT: ${isYouTubeVideo(data.url)}`);
 
       if (isYouTubeVideo(data.url)) {
-        const yt = extractYouTubeContent(data.html);
+        const diag: string[] = [];
+        const yt = extractYouTubeContent(data.html, diag);
+        dbg(...diag);
         extractedTitle = yt?.title || data.title || '';
 
         if (yt) {
@@ -158,8 +171,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           if (channelLine) parts.push(`**Channel:** ${channelLine}`);
           if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
           extractedBodyText = parts.join('\n\n');
+          dbg(`result: OK, title="${yt.title.slice(0, 60)}"`);
         } else {
           extractedBodyText = '⚠️ Could not extract YouTube metadata — YouTube may have changed their page format.';
+          dbg('result: FAILED');
         }
       } else {
         const article = extractContent(data.html, data.url);

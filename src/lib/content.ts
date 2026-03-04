@@ -40,13 +40,17 @@ export function isYouTubeVideo(url: string): boolean {
  * then navigates the data structure to pull out title/channel/description.
  * Returns null if the JSON cannot be found or parsed — this likely means
  * YouTube has changed their data model.
+ *
+ * Pass a `diag` array to collect diagnostic log lines.
  */
-export function extractYouTubeContent(html: string): YouTubeContent | null {
+export function extractYouTubeContent(html: string, diag?: string[]): YouTubeContent | null {
   try {
-    const ytData = parseYtInitialData(html);
+    diag?.push(`html.length = ${html.length}`);
+    const ytData = parseYtInitialData(html, diag);
     if (!ytData) return null;
-    return extractFromYtData(ytData);
-  } catch {
+    return extractFromYtData(ytData, diag);
+  } catch (err) {
+    diag?.push(`uncaught error: ${err}`);
     return null;
   }
 }
@@ -88,19 +92,29 @@ export function extractContent(html: string, url: string): ArticleContent | null
  * We locate the marker string, then slice to the closing </script> tag to get
  * the JSON — no DOMParser or brace-counting needed.
  */
-function parseYtInitialData(html: string): Record<string, unknown> | null {
+function parseYtInitialData(html: string, diag?: string[]): Record<string, unknown> | null {
   const MARKER = 'var ytInitialData = ';
   const markerIdx = html.indexOf(MARKER);
+  diag?.push(`marker idx: ${markerIdx}`);
   if (markerIdx === -1) return null;
 
   const jsonStart = markerIdx + MARKER.length;
-  const scriptEnd = html.indexOf('</script>', jsonStart);
+  // Try lowercase first (standard), then uppercase fallback
+  let scriptEnd = html.indexOf('</script>', jsonStart);
+  if (scriptEnd === -1) scriptEnd = html.indexOf('</SCRIPT>', jsonStart);
+  diag?.push(`</script> idx: ${scriptEnd}`);
   if (scriptEnd === -1) return null;
 
   const jsonStr = html.slice(jsonStart, scriptEnd).trim().replace(/;$/, '').trim();
+  diag?.push(`jsonStr.length: ${jsonStr.length}`);
+  diag?.push(`jsonStr[0..120]: ${jsonStr.slice(0, 120)}`);
   try {
-    return JSON.parse(jsonStr) as Record<string, unknown>;
-  } catch {
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    diag?.push('JSON.parse: OK');
+    return parsed;
+  } catch (err) {
+    diag?.push(`JSON.parse error: ${err}`);
+    diag?.push(`jsonStr tail[-120]: ${jsonStr.slice(-120)}`);
     return null;
   }
 }
@@ -114,7 +128,7 @@ function parseYtInitialData(html: string): Record<string, unknown> | null {
  *
  * Desktop uses twoColumnWatchNextResults; mobile uses singleColumnWatchNextResults.
  */
-function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null {
+function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouTubeContent | null {
   // Desktop layout
   const desktopContents = asArr(
     dig(data, 'contents', 'twoColumnWatchNextResults', 'results', 'results', 'contents'),
@@ -125,6 +139,9 @@ function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null
   const mobileItems = asArr(
     dig(data, 'contents', 'singleColumnWatchNextResults', 'results', 'results', 'contents'),
   );
+
+  diag?.push(`desktop contents: ${desktopContents.length}, mobile items: ${mobileItems.length}`);
+  diag?.push(`top-level contents keys: ${Object.keys((data.contents ?? {}) as object).join(', ')}`);
 
   let title = '';
   let channel = '';
@@ -189,6 +206,7 @@ function extractFromYtData(data: Record<string, unknown>): YouTubeContent | null
     }
   }
 
+  diag?.push(`extracted — title: ${title.slice(0, 60)}, channel: ${channel}, desc.length: ${description.length}`);
   if (!title && !description) return null;
   return { title, channel, subs, description: normalizeText(description) };
 }

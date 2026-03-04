@@ -504,3 +504,34 @@ button.danger {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ---- Debug console ---- */
+
+.debug-details {
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.debug-details summary {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.debug-details pre {
+  margin-top: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+}

@@ -176,7 +176,7 @@ test.describe('Use view', () => {
 // ── YouTube metadata extraction ───────────────────────────────────────────────
 
 test.describe('YouTube metadata extraction', () => {
-  test('extracts title, channel, and description from fixture HTML', async () => {
+  test('extracts title, channel, and description from fixture HTML (Node-side sanity check)', async () => {
     const { readFileSync } = await import('fs');
     const html = readFileSync('test/fixtures/youtube-rosalia.html', 'utf-8');
 
@@ -208,6 +208,95 @@ test.describe('YouTube metadata extraction', () => {
     expect(title).toBe('ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk');
     expect(channel).toBe('ROSALÍA');
     expect(description).toContain('Berghain');
+  });
+
+  test('bookmarklet mode: raw fixture HTML injected directly', async ({ page }, testInfo) => {
+    const { readFileSync } = await import('fs');
+    const fixtureHtml = readFileSync('test/fixtures/youtube-rosalia.html', 'utf-8');
+
+    await page.goto('/?v=TestVault&mode=bm');
+    await expect(page.locator('#loadingIndicator')).toBeVisible();
+
+    await page.evaluate((html) => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'pageContent',
+          html,
+          url: 'https://www.youtube.com/watch?v=7fyufPkXLbs',
+          title: 'ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk',
+        },
+      }));
+    }, fixtureHtml);
+
+    await expect(page.locator('#loadingIndicator')).toHaveCount(0);
+
+    await page.locator('#debugDetails').evaluate(el => el.setAttribute('open', ''));
+    const debugText = await page.locator('#debugLog').textContent();
+    console.log('\n=== [raw fixture] debug log ===\n' + debugText + '\n==============================\n');
+    await page.screenshot({ path: ss(testInfo), fullPage: true });
+
+    await expect(page.locator('#contentPreview')).toBeVisible();
+    await expect(page.locator('#contentPreviewText')).toContainText('ROSALÍA');
+  });
+
+  test('bookmarklet mode: outerHTML captured after browser parses fixture', async ({ page, context }, testInfo) => {
+    const { readFileSync } = await import('fs');
+    const fixtureHtml = readFileSync('test/fixtures/youtube-rosalia.html', 'utf-8');
+
+    // Serve the fixture as a fake YouTube page so the browser actually parses
+    // and runs it (simulating what outerHTML looks like after JS execution)
+    await page.route('https://www.youtube.com/watch?v=fixture', route =>
+      route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixtureHtml }),
+    );
+    const ytPage = await context.newPage();
+    await ytPage.route('https://www.youtube.com/watch?v=fixture', route =>
+      route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixtureHtml }),
+    );
+    await ytPage.goto('https://www.youtube.com/watch?v=fixture', { waitUntil: 'domcontentloaded' });
+
+    // Capture outerHTML + check if ytInitialData marker survived JS execution
+    const { outerHtml, markerPresent, outerHtmlLen } = await ytPage.evaluate(() => {
+      const oh = document.documentElement.outerHTML;
+      return {
+        outerHtml: oh,
+        outerHtmlLen: oh.length,
+        markerPresent: oh.includes('var ytInitialData = '),
+      };
+    });
+    console.log(`\n=== outerHTML stats ===\nlength: ${outerHtmlLen}\nmarker present: ${markerPresent}\n======================\n`);
+
+    await ytPage.close();
+
+    // Now inject the outerHTML into the capture app
+    const capturePage = await context.newPage();
+    await capturePage.goto('http://localhost:5174/?v=TestVault&mode=bm');
+    await expect(capturePage.locator('#loadingIndicator')).toBeVisible();
+
+    await capturePage.evaluate((html) => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: {
+          type: 'pageContent',
+          html,
+          url: 'https://www.youtube.com/watch?v=fixture',
+          title: 'ROSALÍA test',
+        },
+      }));
+    }, outerHtml);
+
+    await expect(capturePage.locator('#loadingIndicator')).toHaveCount(0);
+
+    await capturePage.locator('#debugDetails').evaluate(el => el.setAttribute('open', ''));
+    const debugText = await capturePage.locator('#debugLog').textContent();
+    console.log('\n=== [outerHTML] debug log ===\n' + debugText + '\n=============================\n');
+    await capturePage.screenshot({ path: ss(testInfo), fullPage: true });
+
+    await capturePage.close();
+
+    // If the marker survived, we expect extraction to succeed
+    if (markerPresent) {
+      // Can't assert on capturePage after close — marker check is the key signal
+    }
+    expect(markerPresent).toBe(true); // fails loudly if YouTube strips the script
   });
 });
 
