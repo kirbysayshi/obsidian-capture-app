@@ -6,3 +6,4 @@ dist/
 .env.*
 test/screenshots/*
 !test/screenshots/.gitkeep
+test-results/
