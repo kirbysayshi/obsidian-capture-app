@@ -9,9 +9,10 @@ pnpm dev          # dev server at http://localhost:5174
 pnpm build        # production build → dist/
 pnpm run deploy   # build + push to gh-pages branch (GitHub Pages)
 
-pnpm exec playwright test                          # run all tests
-pnpm exec playwright test test/bookmarklet.spec.js # run one file
-pnpm exec playwright test --reporter=line          # compact output
+pnpm test                                          # run all tests
+pnpm test test/bookmarklet.spec.js                 # run one file
+pnpm test -- --reporter=line                       # compact output
+pnpm test:ui                                       # interactive UI mode
 ```
 
 ## Architecture
