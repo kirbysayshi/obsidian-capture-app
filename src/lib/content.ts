@@ -147,6 +147,11 @@ function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouT
 
   diag?.push(`desktop contents: ${desktopContents.length}, mobile items: ${mobileItems.length}`);
   diag?.push(`top-level contents keys: ${Object.keys((data.contents ?? {}) as object).join(', ')}`);
+  if (mobileItems.length) {
+    mobileItems.forEach((item, i) =>
+      diag?.push(`mobile[${i}] keys: ${Object.keys(item as object).join(', ')}`),
+    );
+  }
 
   let title = '';
   let channel = '';
@@ -179,6 +184,14 @@ function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouT
   // Try mobile path if desktop came up empty
   if (!title && !description) {
     for (const item of mobileItems) {
+      // Log the keys of each renderer inside this item for diagnosis
+      for (const rendererKey of Object.keys(item as object)) {
+        const renderer = (item as Record<string, unknown>)[rendererKey];
+        if (renderer && typeof renderer === 'object') {
+          diag?.push(`  ${rendererKey} keys: ${Object.keys(renderer as object).join(', ')}`);
+        }
+      }
+
       const svmr = dig(item, 'slimVideoMetadataRenderer');
       if (svmr) {
         title = runsText(dig(svmr, 'title', 'runs'));
