@@ -84,13 +84,17 @@ export function extractContent(html: string, url: string): ArticleContent | null
 // ─── ytInitialData parsing ────────────────────────────────────────────────────
 
 /**
- * Find and parse the ytInitialData JSON blob directly from the HTML string.
+ * Find and evaluate the ytInitialData assignment from the HTML string.
  *
- * YouTube embeds the full page data as:
+ * Desktop YouTube embeds it as a JSON object literal:
  *   <script>var ytInitialData = {...};</script>
  *
- * We locate the marker string, then slice to the closing </script> tag to get
- * the JSON — no DOMParser or brace-counting needed.
+ * Mobile YouTube embeds it as a JS string literal with hex escapes:
+ *   <script>var ytInitialData = '\x7b\x22...\x7d';</script>
+ *
+ * We use new Function() to evaluate the assignment so JS handles all escape
+ * sequences natively. The result may be a parsed object (desktop) or a JSON
+ * string (mobile), so we JSON.parse string results.
  */
 function parseYtInitialData(html: string, diag?: string[]): Record<string, unknown> | null {
   const MARKER = 'var ytInitialData = ';
@@ -105,16 +109,17 @@ function parseYtInitialData(html: string, diag?: string[]): Record<string, unkno
   diag?.push(`</script> idx: ${scriptEnd}`);
   if (scriptEnd === -1) return null;
 
-  const jsonStr = html.slice(jsonStart, scriptEnd).trim().replace(/;$/, '').trim();
-  diag?.push(`jsonStr.length: ${jsonStr.length}`);
-  diag?.push(`jsonStr[0..120]: ${jsonStr.slice(0, 120)}`);
+  // Slice the full assignment statement (var ytInitialData = ...;)
+  const scriptBody = html.slice(markerIdx, scriptEnd).trim();
+  diag?.push(`scriptBody[0..120]: ${scriptBody.slice(0, 120)}`);
   try {
-    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-    diag?.push('JSON.parse: OK');
-    return parsed;
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const raw = new Function(`${scriptBody}; return ytInitialData;`)();
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    diag?.push(`eval: OK (type was ${typeof raw})`);
+    return data as Record<string, unknown>;
   } catch (err) {
-    diag?.push(`JSON.parse error: ${err}`);
-    diag?.push(`jsonStr tail[-120]: ${jsonStr.slice(-120)}`);
+    diag?.push(`eval error: ${err}`);
     return null;
   }
 }

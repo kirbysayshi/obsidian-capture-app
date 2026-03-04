@@ -180,7 +180,7 @@ test.describe('YouTube metadata extraction', () => {
     const { readFileSync } = await import('fs');
     const html = readFileSync('test/fixtures/youtube-rosalia.html', 'utf-8');
 
-    // Mirror parseYtInitialData — pure string + JSON.parse, no DOMParser
+    // Mirror parseYtInitialData using new Function (handles both object and string literal forms)
     const MARKER = 'var ytInitialData = ';
     const markerIdx = html.indexOf(MARKER);
     expect(markerIdx).toBeGreaterThan(-1);
@@ -189,7 +189,10 @@ test.describe('YouTube metadata extraction', () => {
     const scriptEnd = html.indexOf('</script>', jsonStart);
     expect(scriptEnd).toBeGreaterThan(-1);
 
-    const data = JSON.parse(html.slice(jsonStart, scriptEnd).trim().replace(/;$/, '').trim());
+    const scriptBody = html.slice(markerIdx, scriptEnd).trim();
+    // eslint-disable-next-line no-new-func
+    const raw = new Function(`${scriptBody}; return ytInitialData;`)();
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
     const contents = data?.contents?.twoColumnWatchNextResults?.results?.results?.contents ?? [];
     let title = '', channel = '', description = '';
@@ -208,6 +211,41 @@ test.describe('YouTube metadata extraction', () => {
     expect(title).toBe('ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk');
     expect(channel).toBe('ROSALÍA');
     expect(description).toContain('Berghain');
+  });
+
+  test('handles mobile string-literal form (hex-escaped JS string)', async () => {
+    // Mobile YouTube wraps ytInitialData as a JS string literal with hex escapes,
+    // e.g. var ytInitialData = '\x7b\x22title\x22:\x22Test\x22\x7d';
+    // new Function() evaluates it natively; JSON.parse handles the resulting string.
+    const jsonObj = { contents: { twoColumnWatchNextResults: { results: { results: {
+      contents: [
+        { videoPrimaryInfoRenderer: { title: { runs: [{ text: 'Mobile Title' }] } } },
+        { videoSecondaryInfoRenderer: {
+          attributedDescription: { content: 'Mobile desc' },
+          owner: { videoOwnerRenderer: { title: { runs: [{ text: 'MobileChannel' }] } } },
+        } },
+      ],
+    } } } } };
+    const hexEscaped = JSON.stringify(jsonObj)
+      .split('').map(c => `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join('');
+    const fakeHtml = `<script>var ytInitialData = '${hexEscaped}';</script>`;
+
+    const MARKER = 'var ytInitialData = ';
+    const markerIdx = fakeHtml.indexOf(MARKER);
+    const scriptEnd = fakeHtml.indexOf('</script>', markerIdx + MARKER.length);
+    const scriptBody = fakeHtml.slice(markerIdx, scriptEnd).trim();
+    // eslint-disable-next-line no-new-func
+    const raw = new Function(`${scriptBody}; return ytInitialData;`)();
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+    const contents = data?.contents?.twoColumnWatchNextResults?.results?.results?.contents ?? [];
+    let title = '';
+    for (const item of contents) {
+      if (item.videoPrimaryInfoRenderer) {
+        title = (item.videoPrimaryInfoRenderer.title.runs ?? []).map(r => r.text).join('');
+      }
+    }
+    expect(title).toBe('Mobile Title');
   });
 
   test('bookmarklet mode: raw fixture HTML injected directly', async ({ page }, testInfo) => {
