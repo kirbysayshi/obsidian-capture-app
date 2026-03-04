@@ -283,6 +283,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       content,
     });
 
+    window.parent.postMessage({ type: 'obsidianUri', url: uri }, '*');
     window.location.href = uri;
 
     // The obsidian:// scheme doesn't navigate away from the page, so reset the
