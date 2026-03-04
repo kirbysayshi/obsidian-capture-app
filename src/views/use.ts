@@ -74,7 +74,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       </div>
 
       <details id="debugDetails" class="debug-details">
-        <summary>Debug</summary>
+        <summary>Debug <button id="btnCopyDebug" class="debug-copy-btn" type="button">Copy</button></summary>
         <pre id="debugLog"></pre>
       </details>
     </div>
@@ -91,10 +91,25 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink')!;
   const boolPropsSection = root.querySelector<HTMLElement>('#boolPropsSection')!;
   const debugLog = root.querySelector<HTMLElement>('#debugLog')!;
+  const btnCopyDebug = root.querySelector<HTMLButtonElement>('#btnCopyDebug')!;
 
   function dbg(...lines: string[]): void {
     debugLog.textContent += lines.join('\n') + '\n';
   }
+
+  btnCopyDebug.addEventListener('click', (e) => {
+    e.preventDefault(); // don't toggle the <details>
+    navigator.clipboard.writeText(debugLog.textContent ?? '').then(() => {
+      btnCopyDebug.textContent = 'Copied!';
+      setTimeout(() => { btnCopyDebug.textContent = 'Copy'; }, 1500);
+    }).catch(() => {
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(debugLog);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    });
+  });
 
   // Render boolean props as checkboxes
   const booleanProps = config.props.filter(p => p.type === 'boolean');

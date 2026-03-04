@@ -514,10 +514,30 @@ button.danger {
 }
 
 .debug-details summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.75rem;
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
+}
+
+.debug-copy-btn {
+  min-height: unset;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.debug-copy-btn:hover {
+  background: var(--border);
+  color: var(--text);
 }
 
 .debug-details pre {
