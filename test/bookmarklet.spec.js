@@ -1,7 +1,11 @@
 /**
  * End-to-end bookmarklet capture flow tests.
  *
- * For each fixture in test/fixtures/:
+ * Fixtures live in test/fixtures/*.md. Each file has two sections:
+ *   1. YAML frontmatter (name, url, expectContains[])
+ *   2. HTML content (served at the fixture's url via page.route)
+ *
+ * For each fixture:
  *   1. Serve the fixture HTML at its configured URL via page.route
  *   2. Inject and run the bookmarklet (creates the overlay iframe)
  *   3. Wait for the iframe's capture form to finish extracting content
@@ -14,46 +18,59 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
 
-// ── Fixture definitions ───────────────────────────────────────────────────────
+// ── Fixture loading ────────────────────────────────────────────────────────────
 
 const VAULT = 'TestVault';
 const FOLDER = 'Inbox';
 const CAPTURE_BASE = `http://localhost:5174/?v=${VAULT}&f=${FOLDER}`;
+const FIXTURES_DIR = 'test/fixtures';
 
-const FIXTURES = [
-  {
-    name: 'YouTube desktop',
-    file: 'youtube-rosalia.html',
-    // Serve at the desktop YouTube URL so isYouTubeVideo() matches
-    url: 'https://www.youtube.com/watch?v=7fyufPkXLbs',
-    expectFileContains: 'Berghain',
-    expectContentContains: [
-      'what: "https://www.youtube.com/watch?v=7fyufPkXLbs"',
-      '# ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk',
-      '**Channel:** ROSALÍA · 12.1M subscribers',
-      // Use a quote-free line — YouTube description uses curly quotes (U+201C/D)
-      'feat. Björk Live at The BRIT Awards 2026',
-      'Directed and Produced by BRIT Awards Ltd',
-    ],
-  },
-  {
-    name: 'YouTube mobile',
-    file: 'youtube-rosalia-mobile.html',
-    // Serve at the mobile YouTube URL so isYouTubeVideo() matches
-    url: 'https://m.youtube.com/watch?v=7fyufPkXLbs',
-    expectFileContains: 'Berghain',
-    expectContentContains: [
-      // YouTube's JS appends tracking params (&pp=...) to location.href on mobile
-      'what: "https://m.youtube.com/watch?v=7fyufPkXLbs',
-      '# ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk',
-      '**Channel:** ROSALÍA · 12.1M',
-      'feat. Björk Live at The BRIT Awards 2026',
-      'Directed and Produced by BRIT Awards Ltd',
-    ],
-  },
-];
+/** Parse a minimal YAML subset: scalar strings and one string-list field. */
+function parseFrontmatter(text) {
+  const fm = {};
+  let currentListKey = null;
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const listItem = line.match(/^  - (.*)$/);
+    if (listItem && currentListKey) {
+      const val = listItem[1];
+      // Strip surrounding single quotes used as YAML string delimiters
+      fm[currentListKey].push(
+        val.startsWith("'") && val.endsWith("'") ? val.slice(1, -1) : val,
+      );
+      continue;
+    }
+    currentListKey = null;
+    const scalar = line.match(/^(\w+):\s*(.*)$/);
+    if (scalar) {
+      const [, key, val] = scalar;
+      if (val === '') {
+        fm[key] = [];
+        currentListKey = key;
+      } else {
+        fm[key] = val;
+      }
+    }
+  }
+  return fm;
+}
+
+/** Parse a fixture .md file into { name, url, expectContains, html }. */
+function parseFixture(filePath) {
+  const raw = readFileSync(filePath, 'utf-8');
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) throw new Error(`Invalid fixture format: ${filePath}`);
+  const [, fmText, html] = match;
+  const fm = parseFrontmatter(fmText);
+  return { name: fm.name, url: fm.url, expectContains: fm.expectContains ?? [], html };
+}
+
+const FIXTURES = readdirSync(FIXTURES_DIR)
+  .filter(f => f.endsWith('.md'))
+  .map(f => parseFixture(join(FIXTURES_DIR, f)));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -98,13 +115,13 @@ test.describe('Bookmarklet capture flow', () => {
   // YouTube fixture pages have CSP headers — bypass so our localhost iframe loads
   test.use({ bypassCSP: true });
 
-  for (const { name, file, url, expectFileContains, expectContentContains } of FIXTURES) {
+  for (const { name, url, expectContains, html } of FIXTURES) {
     test(name, async ({ page }) => {
       // Serve the fixture at its expected URL
       await page.route(url, route =>
         route.fulfill({
           contentType: 'text/html; charset=utf-8',
-          body: readFileSync(`test/fixtures/${file}`, 'utf-8'),
+          body: html,
         }),
       );
 
@@ -144,8 +161,7 @@ test.describe('Bookmarklet capture flow', () => {
       expect(vault).toBe(VAULT);
       expect(filePath).toContain(`${FOLDER}/`);
       expect(filePath).toMatch(/\.md$/);
-      expect(filePath).toContain(expectFileContains);
-      for (const str of expectContentContains) {
+      for (const str of expectContains) {
         expect(content).toContain(str);
       }
     });

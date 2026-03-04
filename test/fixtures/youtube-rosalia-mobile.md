@@ -1,3 +1,13 @@
+---
+name: YouTube mobile
+url: https://m.youtube.com/watch?v=7fyufPkXLbs
+expectContains:
+  - 'what: "https://m.youtube.com/watch?v=7fyufPkXLbs'
+  - '# ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk'
+  - '**Channel:** ROSALÍA · 12.1M'
+  - feat. Björk Live at The BRIT Awards 2026
+  - Directed and Produced by BRIT Awards Ltd
+---
 <!DOCTYPE html>
 <html darker-dark-theme lang="en">
 
