@@ -213,6 +213,47 @@ test.describe('YouTube metadata extraction', () => {
     expect(description).toContain('Berghain');
   });
 
+  test('extracts title, channel, and description from mobile fixture HTML', async () => {
+    const { readFileSync } = await import('fs');
+    const html = readFileSync('test/fixtures/youtube-rosalia-mobile.html', 'utf-8');
+
+    // Replicate parseYtInitialData + extractFromYtData mobile path
+    const MARKER = 'var ytInitialData = ';
+    const mi = html.indexOf(MARKER);
+    const se = html.indexOf('</script>', mi + MARKER.length);
+    const scriptBody = html.slice(mi, se).trim();
+    // eslint-disable-next-line no-new-func
+    const raw = new Function(`${scriptBody}; return ytInitialData;`)();
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+    // Mobile path: slimVideoMetadataSectionRenderer
+    let title = '', channel = '', subs = '', description = '';
+    const mobileItems = data?.contents?.singleColumnWatchNextResults?.results?.results?.contents ?? [];
+    for (const item of mobileItems) {
+      for (const sub of (item?.slimVideoMetadataSectionRenderer?.contents ?? [])) {
+        if (sub.slimVideoInformationRenderer)
+          title = (sub.slimVideoInformationRenderer.title?.runs ?? []).map(r => r.text).join('');
+        if (sub.slimOwnerRenderer) {
+          channel = (sub.slimOwnerRenderer.title?.runs ?? []).map(r => r.text).join('');
+          subs = (sub.slimOwnerRenderer.collapsedSubtitle?.runs ?? []).map(r => r.text).join('');
+        }
+      }
+    }
+    for (const panel of (data?.engagementPanels ?? [])) {
+      const epslr = panel?.engagementPanelSectionListRenderer;
+      if (epslr?.panelIdentifier !== 'video-description-ep-identifier') continue;
+      for (const item of (epslr?.content?.structuredDescriptionContentRenderer?.items ?? [])) {
+        const body = item?.expandableVideoDescriptionBodyRenderer?.attributedDescriptionBodyText?.content;
+        if (body) { description = body; break; }
+      }
+    }
+
+    expect(title).toBe('ROSALÍA - Berghain (Live at The BRIT Awards 2026) ft. Björk');
+    expect(channel).toBe('ROSALÍA');
+    expect(subs).toContain('12');
+    expect(description).toContain('Berghain');
+  });
+
   test('handles mobile string-literal form (hex-escaped JS string)', async () => {
     // Mobile YouTube wraps ytInitialData as a JS string literal with hex escapes,
     // e.g. var ytInitialData = '\x7b\x22title\x22:\x22Test\x22\x7d';

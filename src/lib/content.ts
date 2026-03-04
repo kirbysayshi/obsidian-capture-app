@@ -147,11 +147,6 @@ function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouT
 
   diag?.push(`desktop contents: ${desktopContents.length}, mobile items: ${mobileItems.length}`);
   diag?.push(`top-level contents keys: ${Object.keys((data.contents ?? {}) as object).join(', ')}`);
-  if (mobileItems.length) {
-    mobileItems.forEach((item, i) =>
-      diag?.push(`mobile[${i}] keys: ${Object.keys(item as object).join(', ')}`),
-    );
-  }
 
   let title = '';
   let channel = '';
@@ -181,45 +176,36 @@ function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouT
     }
   }
 
-  // Try mobile path if desktop came up empty
+  // Try mobile path if desktop came up empty.
+  // Mobile structure: singleColumnWatchNextResults → results.results.contents →
+  //   slimVideoMetadataSectionRenderer.contents →
+  //     slimVideoInformationRenderer  (title)
+  //     slimOwnerRenderer             (channel, subs)
+  // Description lives in engagementPanels[id=video-description-ep-identifier] →
+  //   structuredDescriptionContentRenderer.items →
+  //     expandableVideoDescriptionBodyRenderer.attributedDescriptionBodyText.content
   if (!title && !description) {
     for (const item of mobileItems) {
-      // Log the keys of each renderer inside this item for diagnosis
-      for (const rendererKey of Object.keys(item as object)) {
-        const renderer = (item as Record<string, unknown>)[rendererKey];
-        if (renderer && typeof renderer === 'object') {
-          diag?.push(`  ${rendererKey} keys: ${Object.keys(renderer as object).join(', ')}`);
+      for (const sub of asArr(dig(item, 'slimVideoMetadataSectionRenderer', 'contents'))) {
+        const svir = dig(sub, 'slimVideoInformationRenderer');
+        if (svir) title = runsText(dig(svir, 'title', 'runs'));
+
+        const sor = dig(sub, 'slimOwnerRenderer');
+        if (sor) {
+          channel = runsText(dig(sor, 'title', 'runs'));
+          subs = runsText(dig(sor, 'collapsedSubtitle', 'runs')) ||
+                 asStr(dig(sor, 'collapsedSubtitle', 'simpleText'));
         }
       }
+    }
 
-      const svmr = dig(item, 'slimVideoMetadataRenderer');
-      if (svmr) {
-        title = runsText(dig(svmr, 'title', 'runs'));
-        description =
-          runsText(dig(svmr, 'description', 'runs')) ||
-          asStr(dig(svmr, 'description', 'simpleText'));
-      }
-
-      const sor = dig(item, 'slimOwnerRenderer');
-      if (sor) {
-        channel = runsText(dig(sor, 'title', 'runs'));
-        subs =
-          asStr(dig(sor, 'collapsedSubtitle', 'simpleText')) ||
-          runsText(dig(sor, 'collapsedSubtitle', 'runs'));
-      }
-
-      // Also try engagementPanels path for description on newer mobile layouts
-      const epvmr = dig(item, 'engagementPanelSectionListRenderer',
-        'content', 'structuredDescriptionContentRenderer',
-        'items');
-      if (epvmr && !description) {
-        for (const ep of asArr(epvmr)) {
-          const snippet = dig(ep, 'videoDescriptionHeaderRenderer', 'description', 'content');
-          if (typeof snippet === 'string' && snippet) {
-            description = snippet;
-            break;
-          }
-        }
+    // Description is in a named engagement panel
+    for (const panel of asArr(dig(data, 'engagementPanels'))) {
+      const epslr = dig(panel, 'engagementPanelSectionListRenderer');
+      if (asStr(dig(epslr, 'panelIdentifier')) !== 'video-description-ep-identifier') continue;
+      for (const item of asArr(dig(epslr, 'content', 'structuredDescriptionContentRenderer', 'items'))) {
+        const body = dig(item, 'expandableVideoDescriptionBodyRenderer', 'attributedDescriptionBodyText', 'content');
+        if (typeof body === 'string' && body) { description = body; break; }
       }
     }
   }
