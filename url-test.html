@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>URL Payload Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 540px; margin: 2rem auto; padding: 1rem; line-height: 1.5; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .ok   { border-color: #2d6a4f; background: #d8f3dc; }
+    .fail { border-color: #c1121f; background: #ffd7d7; }
+    .info { border-color: #0077b6; background: #caf0f8; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 1px solid #aaa; background: #fff; margin-right: 0.5rem; }
+    button:active { background: #eee; }
+    select { font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>URL Payload Test</h1>
+  <div id="root"></div>
+
+  <script>
+    const root = document.getElementById('root');
+    const params = new URLSearchParams(location.search);
+
+    if (location.hash.length > 1) {
+      // ── Receiver ─────────────────────────────────────────────────────────────
+      const received = location.hash.slice(1); // strip leading '#'
+      const expected = parseInt(params.get('n') ?? '0', 10);
+      const match = received.length === expected;
+
+      let decodeOk = false;
+      let decodedLen = 0;
+      try {
+        decodedLen = atob(received).length;
+        decodeOk = true;
+      } catch (_) {}
+
+      root.innerHTML = `
+        <div class="card ${match && decodeOk ? 'ok' : 'fail'}">
+          <p><strong>${match && decodeOk ? '✅ Payload arrived intact' : '❌ Payload was truncated or corrupted'}</strong></p>
+          <p>Received: <strong>${received.length.toLocaleString()}</strong> chars</p>
+          <p>Expected: <strong>${expected.toLocaleString()}</strong> chars</p>
+          ${!match ? `<p>Missing: <strong>${(expected - received.length).toLocaleString()}</strong> chars</p>` : ''}
+          <p>Base64 decode: <strong>${decodeOk ? `✅ OK (${decodedLen.toLocaleString()} bytes)` : '❌ Failed — likely truncated mid-string'}</strong></p>
+        </div>
+        <p><a href="${location.pathname}">← Back to generator</a></p>
+      `;
+
+    } else {
+      // ── Generator ────────────────────────────────────────────────────────────
+      root.innerHTML = `
+        <p>Generates a synthetic HTML payload, base64-encodes it, and navigates to this page
+           with it as a URL fragment — to check whether the full payload survives.</p>
+        <div class="card info">
+          <label for="size">Target HTML size: </label>
+          <select id="size">
+            <option value="100">~100 KB</option>
+            <option value="261" selected>~261 KB (Bandcamp)</option>
+            <option value="500">~500 KB</option>
+          </select>
+        </div>
+        <button id="btnGenerate">Generate</button>
+        <div id="result"></div>
+      `;
+
+      document.getElementById('btnGenerate').addEventListener('click', () => {
+        const kb = parseInt(document.getElementById('size').value, 10);
+        const target = kb * 1024;
+
+        const row = '<div class="item"><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p></div>\n';
+        let html = '<!DOCTYPE html><html><head><title>Synthetic test</title></head><body>\n';
+        while (html.length < target - 30) html += row;
+        html += '</body></html>';
+
+        const b64 = btoa(html);
+        const url = `${location.pathname}?n=${b64.length}#${b64}`;
+        const fullUrl = `${location.origin}${url}`;
+
+        document.getElementById('result').innerHTML = `
+          <div class="card info">
+            <p>HTML: <strong>${(html.length / 1024).toFixed(1)} KB</strong></p>
+            <p>Base64: <strong>${(b64.length / 1024).toFixed(1)} KB</strong></p>
+            <p>Full URL: <strong>${(url.length / 1024).toFixed(1)} KB</strong></p>
+          </div>
+          <button id="btnOpen">Open in browser</button>
+          <button id="btnCopy">Copy URL</button>
+          <span id="copyStatus"></span>
+        `;
+
+        document.getElementById('btnOpen').addEventListener('click', () => {
+          location.href = url;
+        });
+
+        document.getElementById('btnCopy').addEventListener('click', () => {
+          navigator.clipboard.writeText(fullUrl)
+            .then(() => { document.getElementById('copyStatus').textContent = ' Copied!'; })
+            .catch(() => { document.getElementById('copyStatus').textContent = ' Copy failed'; });
+        });
+      });
+    }
+  </script>
+</body>
+</html>
