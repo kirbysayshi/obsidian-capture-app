@@ -156,8 +156,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
   if (isBookmarklet) {
     const hashData = location.hash.slice(1);
-    const sourceUrl = params.get('url') ?? '';
-    const sourceTitle = params.get('title') ?? '';
+    // params.get() decodes once; Shortcuts' URL-type conversion can double-encode
+    // (%3A → %253A), so decode a second time to recover the original value.
+    const sourceUrl = safeDecodeUri(params.get('url') ?? '');
+    const sourceTitle = safeDecodeUri(params.get('title') ?? '');
 
     extractedUrl = sourceUrl;
     dbg(`url: ${sourceUrl}`, `hash.length: ${hashData.length}`, `isYT: ${isYouTubeVideo(sourceUrl)}`);
@@ -321,6 +323,11 @@ function isStandalone(): boolean {
 /** Escape a string for use in an HTML attribute value. */
 function escProp(str: string): string {
   return str.replace(/"/g, '&quot;');
+}
+
+/** Decode a URI component, ignoring errors (returns original string on failure). */
+function safeDecodeUri(s: string): string {
+  try { return decodeURIComponent(s); } catch { return s; }
 }
 
 /** Return the first http(s) URL found in a string, or empty string. */
