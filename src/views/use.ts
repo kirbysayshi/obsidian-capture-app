@@ -7,14 +7,7 @@ import {
   makeReadableSlug,
   makeHumanTimestamp,
 } from '../lib/obsidian.js';
-import { extractContent, extractYouTubeContent, isYouTubeVideo } from '../lib/content.js';
-
-interface PageContentMessage {
-  type: 'pageContent';
-  html: string;
-  url: string;
-  title: string;
-}
+import { extractContent, extractYouTubeContent, extractFromYtData, isYouTubeVideo } from '../lib/content.js';
 
 export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const config = decodeConfig(params);
@@ -162,67 +155,86 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   });
 
   if (isBookmarklet) {
-    // Request page content from the parent bookmarklet overlay
-    window.parent.postMessage({ type: 'requestContent' }, '*');
+    const hashData = location.hash.slice(1);
+    const sourceUrl = params.get('url') ?? '';
+    const sourceTitle = params.get('title') ?? '';
 
-    function handleMessage(e: MessageEvent): void {
-      const data = e.data as PageContentMessage | undefined;
-      if (!data || data.type !== 'pageContent') return;
-      window.removeEventListener('message', handleMessage);
+    extractedUrl = sourceUrl;
+    dbg(`url: ${sourceUrl}`, `hash.length: ${hashData.length}`, `isYT: ${isYouTubeVideo(sourceUrl)}`);
 
-      extractedUrl = data.url ?? '';
-      dbg(`url: ${data.url}`, `html.length: ${data.html?.length ?? 'undefined'}`, `isYT: ${isYouTubeVideo(data.url)}`);
+    if (hashData) {
+      try {
+        const decoded = new TextDecoder().decode(
+          Uint8Array.from(atob(hashData), c => c.charCodeAt(0))
+        );
+        // Fragment is JSON {html, yt?} (bookmarklet) or raw HTML (Shortcuts path).
+        let html: string;
+        let ytDataObj: Record<string, unknown> | null = null;
+        try {
+          const parsed = JSON.parse(decoded) as { html: string; yt?: Record<string, unknown> };
+          html = parsed.html;
+          ytDataObj = parsed.yt ?? null;
+        } catch {
+          html = decoded;
+        }
+        dbg(`html.length: ${html.length}`);
 
-      if (isYouTubeVideo(data.url)) {
-        const diag: string[] = [];
-        const yt = extractYouTubeContent(data.html, diag);
-        dbg(...diag);
-        extractedTitle = yt?.title || data.title || '';
+        if (isYouTubeVideo(sourceUrl)) {
+          const diag: string[] = [];
+          // Prefer pre-extracted subset from bookmarklet; fall back to searching HTML
+          // (works when HTML still contains scripts, e.g. a future Shortcuts path).
+          const yt = ytDataObj
+            ? extractFromYtData(ytDataObj, diag)
+            : extractYouTubeContent(html, diag);
+          dbg(...diag);
+          extractedTitle = yt?.title || sourceTitle || '';
 
-        if (yt) {
-          const parts: string[] = [];
-          parts.push(`# ${yt.title}`);
-          const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
-          if (channelLine) parts.push(`**Channel:** ${channelLine}`);
-          if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
-          extractedBodyText = parts.join('\n\n');
-          dbg(`result: OK, title="${yt.title.slice(0, 60)}"`);
+          if (yt) {
+            const parts: string[] = [];
+            parts.push(`# ${yt.title}`);
+            const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
+            if (channelLine) parts.push(`**Channel:** ${channelLine}`);
+            if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
+            extractedBodyText = parts.join('\n\n');
+            dbg(`result: OK, title="${yt.title.slice(0, 60)}"`);
+          } else {
+            extractedBodyText = '⚠️ Could not extract YouTube metadata — YouTube may have changed their page format.';
+            dbg('result: FAILED');
+          }
         } else {
-          extractedBodyText = '⚠️ Could not extract YouTube metadata — YouTube may have changed their page format.';
-          dbg('result: FAILED');
+          const article = extractContent(html, sourceUrl);
+          extractedTitle = (article?.title || sourceTitle || '').trim();
+
+          if (article) {
+            const meta: string[] = [];
+            if (article.byline) meta.push(`By: ${article.byline}`);
+            if (article.siteName) meta.push(`Site: ${article.siteName}`);
+            if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
+
+            const parts: string[] = [];
+            parts.push(`# ${extractedTitle}`);
+            if (meta.length) parts.push(meta.join(' · '));
+            if (article.excerpt) parts.push(`> ${article.excerpt}`);
+            if (article.textContent) parts.push(article.textContent);
+            extractedBodyText = parts.join('\n\n');
+          }
         }
-      } else {
-        const article = extractContent(data.html, data.url);
-        extractedTitle = (article?.title || data.title || '').trim();
-
-        if (article) {
-          const meta: string[] = [];
-          if (article.byline) meta.push(`By: ${article.byline}`);
-          if (article.siteName) meta.push(`Site: ${article.siteName}`);
-          if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
-
-          const parts: string[] = [];
-          parts.push(`# ${extractedTitle}`);
-          if (meta.length) parts.push(meta.join(' · '));
-          if (article.excerpt) parts.push(`> ${article.excerpt}`);
-          if (article.textContent) parts.push(article.textContent);
-          extractedBodyText = parts.join('\n\n');
-        }
+      } catch (e) {
+        dbg(`decode error: ${e}`);
       }
-
-      // Pre-fill what with just the URL — that's all that goes in the frontmatter
-      fieldWhat.value = data.url ?? '';
-
-      if (extractedBodyText) {
-        contentPreviewText.textContent = extractedBodyText;
-        contentPreview.style.display = 'block';
-      }
-
-      loadingIndicator?.remove();
-      fieldWhat.focus();
+    } else {
+      extractedTitle = sourceTitle;
     }
 
-    window.addEventListener('message', handleMessage);
+    fieldWhat.value = sourceUrl;
+
+    if (extractedBodyText) {
+      contentPreviewText.textContent = extractedBodyText;
+      contentPreview.style.display = 'block';
+    }
+
+    loadingIndicator?.remove();
+    fieldWhat.focus();
   }
 
   btnSave.addEventListener('click', () => {

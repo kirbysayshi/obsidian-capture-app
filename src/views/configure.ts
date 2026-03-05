@@ -63,11 +63,24 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
           <a id="bookmarkletLink" class="bookmarklet-link" href="#">⚡ Capture to Obsidian</a>
         </div>
 
+        <div class="output-block">
+          <label>iOS Shortcut base URL — paste into the Shortcut template</label>
+          <div class="copy-row">
+            <input type="text" id="shortcutUrlInput" readonly>
+            <button id="btnCopyShortcutUrl">Copy</button>
+          </div>
+          <p class="field-hint">
+            Use this URL in the <em>Capture to Obsidian</em> Shortcut. The Shortcut fetches the shared page,
+            Base64-encodes the HTML, and appends it as a fragment so the capture form can extract content —
+            useful on Firefox iOS where the bookmarklet is blocked by strict CSP.
+          </p>
+        </div>
+
         <div class="instructions">
           <ol>
             <li><strong>Desktop:</strong> Drag the bookmarklet link above to your browser toolbar.</li>
-            <li><strong>iPhone/iPad:</strong> Tap Open, then Share → Add to Home Screen. The icon and name will be set as configured above.</li>
-            <li>On any page, click/tap the bookmark or shortcut to open the capture overlay.</li>
+            <li><strong>iPhone/iPad (Safari):</strong> Tap Open, then Share → Add to Home Screen. The icon and name will be set as configured above.</li>
+            <li><strong>iPhone/iPad (Firefox):</strong> Use the iOS Shortcut — share any page to it and the capture form opens with content pre-filled.</li>
           </ol>
         </div>
       </div>
@@ -85,6 +98,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   const btnCopyUrl = root.querySelector<HTMLButtonElement>('#btnCopyUrl')!;
   const btnOpenUrl = root.querySelector<HTMLButtonElement>('#btnOpenUrl')!;
   const bookmarkletLink = root.querySelector<HTMLAnchorElement>('#bookmarkletLink')!;
+  const shortcutUrlInput = root.querySelector<HTMLInputElement>('#shortcutUrlInput')!;
+  const btnCopyShortcutUrl = root.querySelector<HTMLButtonElement>('#btnCopyShortcutUrl')!;
   const staleNotice = root.querySelector<HTMLElement>('#staleNotice')!;
   let lastGeneratedSnapshot = '';
 
@@ -203,6 +218,7 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
 
     lastGeneratedSnapshot = params.toString();
     useUrlInput.value = useUrl;
+    shortcutUrlInput.value = useUrl;
     bookmarkletLink.href = generateBookmarklet(useUrl);
     bookmarkletLink.textContent = `${cfg.emoji || '⚡'} ${displayName}`;
     staleNotice.style.display = 'none';
@@ -226,6 +242,15 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       setTimeout(() => { btnCopyUrl.textContent = 'Copy'; }, 1500);
     }).catch(() => {
       useUrlInput.select();
+    });
+  });
+
+  btnCopyShortcutUrl.addEventListener('click', () => {
+    navigator.clipboard.writeText(shortcutUrlInput.value).then(() => {
+      btnCopyShortcutUrl.textContent = 'Copied!';
+      setTimeout(() => { btnCopyShortcutUrl.textContent = 'Copy'; }, 1500);
+    }).catch(() => {
+      shortcutUrlInput.select();
     });
   });
 }

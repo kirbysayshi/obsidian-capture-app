@@ -37,9 +37,11 @@ function parseFrontmatter(text) {
     const listItem = line.match(/^  - (.*)$/);
     if (listItem && currentListKey) {
       const val = listItem[1];
-      // Strip surrounding single quotes used as YAML string delimiters
+      // Strip surrounding single or double quotes used as YAML string delimiters
       fm[currentListKey].push(
-        val.startsWith("'") && val.endsWith("'") ? val.slice(1, -1) : val,
+        (val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))
+          ? val.slice(1, -1)
+          : val,
       );
       continue;
     }
@@ -84,20 +86,64 @@ function runBookmarklet(configuredUrl) {
   overlay.id = ID;
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;background:rgba(0,0,0,.6)';
   const iframe = document.createElement('iframe');
-  iframe.src = configuredUrl + '&mode=bm';
+  const html = document.documentElement.outerHTML;
+  const stripped = html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+
+  let ytSubset = null;
+  try {
+    const ytGlobal = window.ytInitialData;
+    if (ytGlobal) {
+      const ytData = typeof ytGlobal === 'string' ? JSON.parse(ytGlobal) : ytGlobal;
+      const subset = {};
+      const c = ytData.contents;
+      if (c && c.twoColumnWatchNextResults) {
+        const items = c.twoColumnWatchNextResults?.results?.results?.contents ?? [];
+        subset.contents = {
+          twoColumnWatchNextResults: {
+            results: { results: { contents: items.filter(item =>
+              item.videoPrimaryInfoRenderer || item.videoSecondaryInfoRenderer
+            ) } },
+          },
+        };
+      } else if (c && c.singleColumnWatchNextResults) {
+        const mItems = c.singleColumnWatchNextResults?.results?.results?.contents ?? [];
+        subset.contents = {
+          singleColumnWatchNextResults: {
+            results: { results: { contents: mItems.filter(item =>
+              item.slimVideoMetadataSectionRenderer
+            ) } },
+          },
+        };
+        if (ytData.engagementPanels) {
+          subset.engagementPanels = ytData.engagementPanels.filter(p => {
+            const epslr = p.engagementPanelSectionListRenderer;
+            return epslr && epslr.panelIdentifier === 'video-description-ep-identifier';
+          });
+        }
+      }
+      if (subset.contents) { ytSubset = subset; }
+    }
+  } catch (_e) { /* silent */ }
+
+  const payload = { html: stripped };
+  if (ytSubset) payload.yt = ytSubset;
+  const b64 = btoa(
+    Array.from(new TextEncoder().encode(JSON.stringify(payload)))
+      .map(b => String.fromCharCode(b))
+      .join('')
+  );
+  iframe.src = configuredUrl
+    + '&mode=bm'
+    + '&url=' + encodeURIComponent(location.href)
+    + '&title=' + encodeURIComponent(document.title)
+    + '#' + b64;
   iframe.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(500px,95vw);height:min(640px,90vh);border:none;border-radius:12px';
   overlay.appendChild(iframe);
   document.body.appendChild(overlay);
   window.addEventListener('message', function handler(e) {
     if (e.source !== iframe.contentWindow) return;
-    if (e.data && e.data.type === 'requestContent') {
-      iframe.contentWindow.postMessage({
-        type: 'pageContent',
-        html: document.documentElement.outerHTML,
-        url: location.href,
-        title: document.title,
-      }, '*');
-    }
     if (e.data && e.data.type === 'close') {
       overlay.remove();
       window.removeEventListener('message', handler);
