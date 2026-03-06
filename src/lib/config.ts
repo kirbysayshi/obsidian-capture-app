@@ -15,6 +15,20 @@ export interface Config {
   emoji: string;
 }
 
+function utf8ToBase64(str: string): string {
+  return btoa(
+    Array.from(new TextEncoder().encode(str))
+      .map(b => String.fromCharCode(b))
+      .join('')
+  );
+}
+
+function base64ToUtf8(b64: string): string {
+  return new TextDecoder().decode(
+    Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+  );
+}
+
 /**
  * Encode a Config object into URL search params.
  */
@@ -29,6 +43,48 @@ export function encodeConfig(config: Config): URLSearchParams {
     params.set('props', btoa(JSON.stringify(config.props)));
   }
   return params;
+}
+
+interface EncodedInstance {
+  vault: string;
+  folder?: string;
+  name?: string;
+  emoji?: string;
+  canvas?: boolean;
+  props?: Prop[];
+}
+
+export function encodeInstances(configs: Config[]): URLSearchParams {
+  const params = new URLSearchParams();
+  const data: EncodedInstance[] = configs.map(cfg => {
+    const entry: EncodedInstance = { vault: cfg.vault };
+    if (cfg.folder) entry.folder = cfg.folder;
+    if (cfg.name) entry.name = cfg.name;
+    if (cfg.emoji) entry.emoji = cfg.emoji;
+    if (cfg.canvas) entry.canvas = true;
+    if (cfg.props.length > 0) entry.props = cfg.props;
+    return entry;
+  });
+  params.set('instances', utf8ToBase64(JSON.stringify(data)));
+  return params;
+}
+
+export function decodeInstances(params: URLSearchParams): Config[] | null {
+  const raw = params.get('instances');
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(base64ToUtf8(raw)) as EncodedInstance[];
+    return data.map(entry => ({
+      vault: entry.vault ?? '',
+      folder: entry.folder ?? '',
+      name: entry.name ?? '',
+      emoji: entry.emoji ?? '',
+      canvas: entry.canvas ?? false,
+      props: entry.props ?? [],
+    }));
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -25,7 +25,13 @@ import { join } from 'path';
 
 const VAULT = 'TestVault';
 const FOLDER = 'Inbox';
-const CAPTURE_BASE = `http://localhost:5174/?v=${VAULT}&f=${FOLDER}`;
+const INSTANCES_JSON = JSON.stringify([{ vault: VAULT, folder: FOLDER }]);
+const INSTANCES_PARAM = encodeURIComponent(btoa(
+  Array.from(new TextEncoder().encode(INSTANCES_JSON))
+    .map(b => String.fromCharCode(b))
+    .join(''),
+));
+const CAPTURE_BASE = `http://localhost:5174/?instances=${INSTANCES_PARAM}`;
 const FIXTURES_DIR = 'test/fixtures';
 
 /** Parse a minimal YAML subset: scalar strings and one string-list field. */

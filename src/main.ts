@@ -11,7 +11,7 @@ const app = document.getElementById('app')!;
 
 if (params.get('mode') === 'configure') {
   renderConfigure(app, params);
-} else if (params.get('v')) {
+} else if (params.get('instances')) {
   renderUse(app, params);
 } else {
   renderConfigure(app);

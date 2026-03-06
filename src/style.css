@@ -160,7 +160,8 @@ button.danger {
   width: auto;
 }
 
-.name-emoji-row #shortcutName {
+.name-emoji-row #shortcutName,
+.name-emoji-row .shortcut-name-input {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -274,6 +275,68 @@ button.danger {
   flex-shrink: 0;
 }
 
+/* Instance cards */
+.instance-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.instance-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface);
+  cursor: default;
+}
+
+.instance-toggle {
+  min-height: unset;
+  height: 28px;
+  width: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.instance-toggle:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+.instance-header-label {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-remove-instance {
+  flex-shrink: 0;
+}
+
+.instance-body {
+  padding: 16px 16px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-add-instance {
+  width: 100%;
+  min-height: 40px;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
 /* Generate button */
 .btn-generate {
   width: 100%;
@@ -363,6 +426,68 @@ button.danger {
 
 .instructions li {
   margin-bottom: 4px;
+}
+
+/* ---- Instance picker (use view) ---- */
+
+.instance-picker {
+  padding: 24px 16px 8px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.instance-picker h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.instance-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  font-weight: normal;
+  text-align: left;
+  margin-bottom: 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.instance-option:hover {
+  background: var(--surface2);
+  border-color: var(--accent);
+}
+
+.instance-option-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.instance-option-name {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.instance-option-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 /* ---- Update banner ---- */

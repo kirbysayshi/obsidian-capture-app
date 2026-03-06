@@ -41,12 +41,13 @@ Single-page Vite/TypeScript app with no framework. All DOM manipulation is vanil
 
 ### Bookmarklet flow
 
-1. User clicks the bookmarklet on any page → `bookmarkletFn` in `src/lib/bookmarklet.ts` injects a fullscreen overlay `<div>` containing an `<iframe>` pointing at the Use view URL with `&mode=bm`.
-2. The iframe (`use.ts`) sends `postMessage({ type: 'requestContent' })` to its parent.
-3. The parent responds with `{ type: 'pageContent', html, url, title }` (the current page's `outerHTML`).
-4. `use.ts` extracts content: YouTube pages → `extractYouTubeContent()` (parses `ytInitialData` JSON); all others → `extractContent()` via `@mozilla/readability`.
-5. On Save, `use.ts` posts `{ type: 'obsidianUri', url }` to the parent (for testing), then navigates via `window.location.href = obsidian://new?...`.
-6. The parent closes the overlay on `{ type: 'close' }`.
+1. User clicks the bookmarklet on any page → `bookmarkletFn` in `src/lib/bookmarklet.ts` injects a fullscreen overlay `<div>` containing an `<iframe>`.
+2. Before building the iframe src, the bookmarklet: strips all `<script>`/`<style>` tags from `outerHTML`; for YouTube pages, extracts a compact subset of `window.ytInitialData` (only the renderers needed for title/channel/description). It then JSON-encodes `{ html, yt? }` and base64-encodes it into the iframe src fragment: `<useUrl>&mode=bm&url=<encoded>&title=<encoded>#<b64>`.
+3. `use.ts` reads `location.hash`, base64-decodes it, JSON-parses the payload, and extracts content: YouTube → `extractFromYtData(yt)` (or `extractYouTubeContent(html)` fallback); all others → `extractContent(html)` via `@mozilla/readability`. The `url` and `title` query params are decoded with `safeDecodeUri()` (double-`decodeURIComponent`) to handle iOS Shortcuts' URL-type conversion re-encoding `%` sequences.
+4. On Save, `use.ts` posts `{ type: 'obsidianUri', url }` to the parent (for testing), then navigates via `window.location.href = obsidian://new?...`.
+5. The parent closes the overlay on `{ type: 'close' }`.
+
+The same fragment schema (`{ html, yt? }` base64 in the URL fragment) is used by the iOS Shortcut path — the Shortcut fetches the page HTML, base64-encodes it as raw HTML (not JSON), and the app's `JSON.parse` fallback in `use.ts` handles it transparently.
 
 ### YouTube extraction (`src/lib/content.ts`)
 
