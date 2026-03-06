@@ -7,6 +7,15 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       <h1>Obsidian Capture</h1>
       <p class="subtitle">Configure your capture settings, then save the generated link as a bookmark or home screen shortcut.</p>
 
+      <div class="field">
+        <label>Shortcut / home screen name</label>
+        <div class="name-emoji-row">
+          <input type="text" id="globalEmojiInput" class="emoji-input" placeholder="⚡" autocomplete="off" maxlength="2">
+          <input type="text" id="globalNameInput" placeholder="Capture to Obsidian" autocomplete="off">
+        </div>
+        <p class="field-hint">Name and icon used for the bookmark button and iOS home screen shortcut. Leave blank to use the first instance.</p>
+      </div>
+
       <div id="instancesList"></div>
       <button class="secondary btn-add-instance" id="btnAddInstance" type="button">+ Add instance</button>
 
@@ -55,6 +64,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   `;
 
   const instancesList = root.querySelector<HTMLElement>('#instancesList')!;
+  const globalNameInput = root.querySelector<HTMLInputElement>('#globalNameInput')!;
+  const globalEmojiInput = root.querySelector<HTMLInputElement>('#globalEmojiInput')!;
   const btnAddInstance = root.querySelector<HTMLButtonElement>('#btnAddInstance')!;
   const btnGenerate = root.querySelector<HTMLButtonElement>('#btnGenerate')!;
   const outputSection = root.querySelector<HTMLElement>('#outputSection')!;
@@ -82,6 +93,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       <div class="instance-header">
         <button class="instance-toggle" type="button" aria-label="Toggle">${expanded ? '▼' : '▶'}</button>
         <span class="instance-header-label">${escHtml(headerLabel)}</span>
+        <button class="btn-sort-up instance-sort-btn" type="button" title="Move up" aria-label="Move up">↑</button>
+        <button class="btn-sort-down instance-sort-btn" type="button" title="Move down" aria-label="Move down">↓</button>
         <button class="btn-remove-instance danger" type="button" aria-label="Remove instance">✕</button>
       </div>
       <div class="instance-body" style="${expanded ? '' : 'display:none'}">
@@ -96,12 +109,12 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
         </div>
 
         <div class="field shortcut-name-field">
-          <label>Shortcut / bookmarklet name</label>
+          <label>Name</label>
           <div class="name-emoji-row">
             <input type="text" class="shortcut-emoji-input emoji-input" placeholder="📎" autocomplete="off" maxlength="2" value="${escAttr(cfg?.emoji ?? '')}">
             <input type="text" class="shortcut-name-input" placeholder="Capture to Obsidian" autocomplete="off" value="${escAttr(cfg?.name ?? '')}">
           </div>
-          <p class="field-hint">Name shown as bookmarklet label and iOS home screen title. Emoji used as the home screen icon (leave blank to use the first letter).</p>
+          <p class="field-hint">Shown in the picker and as the form heading. Emoji used as the icon.</p>
         </div>
 
         <div class="field">
@@ -126,6 +139,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     const body = card.querySelector<HTMLElement>('.instance-body')!;
     const toggleBtn = card.querySelector<HTMLButtonElement>('.instance-toggle')!;
     const removeBtn = card.querySelector<HTMLButtonElement>('.btn-remove-instance')!;
+    const sortUpBtn = card.querySelector<HTMLButtonElement>('.btn-sort-up')!;
+    const sortDownBtn = card.querySelector<HTMLButtonElement>('.btn-sort-down')!;
     const headerLabelEl = card.querySelector<HTMLElement>('.instance-header-label')!;
     const emojiInput = card.querySelector<HTMLInputElement>('.shortcut-emoji-input')!;
     const nameInput = card.querySelector<HTMLInputElement>('.shortcut-name-input')!;
@@ -148,7 +163,21 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     // Remove card
     removeBtn.addEventListener('click', () => {
       card.remove();
-      updateDeleteButtons();
+      updateCardButtons();
+      updateStaleNotice();
+    });
+
+    // Sort card up/down
+    sortUpBtn.addEventListener('click', () => {
+      const prev = card.previousElementSibling;
+      if (prev) instancesList.insertBefore(card, prev);
+      updateCardButtons();
+      updateStaleNotice();
+    });
+    sortDownBtn.addEventListener('click', () => {
+      const next = card.nextElementSibling;
+      if (next) instancesList.insertBefore(next, card);
+      updateCardButtons();
       updateStaleNotice();
     });
 
@@ -246,24 +275,32 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     return Array.from(instancesList.querySelectorAll<HTMLElement>('.instance-card')).map(readCard);
   }
 
-  function updateDeleteButtons(): void {
-    const cards = instancesList.querySelectorAll<HTMLElement>('.instance-card');
-    cards.forEach(card => {
-      const btn = card.querySelector<HTMLButtonElement>('.btn-remove-instance')!;
-      btn.style.display = cards.length === 1 ? 'none' : '';
+  function updateCardButtons(): void {
+    const cards = Array.from(instancesList.querySelectorAll<HTMLElement>('.instance-card'));
+    cards.forEach((card, i) => {
+      card.querySelector<HTMLButtonElement>('.btn-remove-instance')!.style.display = cards.length === 1 ? 'none' : '';
+      card.querySelector<HTMLButtonElement>('.btn-sort-up')!.style.display = i === 0 ? 'none' : '';
+      card.querySelector<HTMLButtonElement>('.btn-sort-down')!.style.display = i === cards.length - 1 ? 'none' : '';
+    });
+  }
+
+  function getSnapshot(): string {
+    return JSON.stringify({
+      sn: globalNameInput.value.trim(),
+      se: globalEmojiInput.value.trim(),
+      instances: readAllInstances(),
     });
   }
 
   function updateStaleNotice(): void {
     if (outputSection.style.display === 'none') return;
-    const current = JSON.stringify(readAllInstances());
-    staleNotice.style.display = current === lastGeneratedSnapshot ? 'none' : 'block';
+    staleNotice.style.display = getSnapshot() === lastGeneratedSnapshot ? 'none' : 'block';
   }
 
   function addCard(cfg?: Partial<Config>, expanded = false): void {
     const card = createInstanceCard(cfg, expanded);
     instancesList.appendChild(card);
-    updateDeleteButtons();
+    updateCardButtons();
   }
 
   // ── Listen for changes ────────────────────────────────────────────────────
@@ -276,6 +313,13 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   });
 
   // ── Prefill or blank start ────────────────────────────────────────────────
+
+  if (prefill) {
+    const sn = prefill.get('sn');
+    const se = prefill.get('se');
+    if (sn) globalNameInput.value = sn;
+    if (se) globalEmojiInput.value = se;
+  }
 
   if (prefill?.get('instances')) {
     const instances = decodeInstances(prefill);
@@ -303,21 +347,38 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
 
   btnGenerate.addEventListener('click', () => {
     const instances = readAllInstances();
-    if (!instances[0].vault) {
-      instancesList.querySelector<HTMLInputElement>('.vault-input')?.focus();
-      return;
+    const cards = Array.from(instancesList.querySelectorAll<HTMLElement>('.instance-card'));
+    for (let i = 0; i < instances.length; i++) {
+      const missingVault = !instances[i].vault;
+      const missingFolder = !instances[i].folder;
+      if (missingVault || missingFolder) {
+        // Expand card if collapsed so the field is visible
+        const card = cards[i];
+        if (card.dataset.expanded !== 'true') {
+          card.dataset.expanded = 'true';
+          card.querySelector<HTMLButtonElement>('.instance-toggle')!.textContent = '▼';
+          card.querySelector<HTMLElement>('.instance-body')!.style.display = '';
+        }
+        card.querySelector<HTMLInputElement>(missingVault ? '.vault-input' : '.folder-input')?.focus();
+        return;
+      }
     }
 
     const params = encodeInstances(instances);
+    const globalName = globalNameInput.value.trim();
+    const globalEmoji = globalEmojiInput.value.trim();
+    if (globalName) params.set('sn', globalName);
+    if (globalEmoji) params.set('se', globalEmoji);
     const useUrl = `${window.location.origin}${window.location.pathname}?${params}`;
     const firstInstance = instances[0];
-    const displayName = firstInstance.name || 'Capture to Obsidian';
+    const displayName = globalName || firstInstance.name || 'Capture to Obsidian';
+    const displayEmoji = globalEmoji || firstInstance.emoji || '⚡';
 
-    lastGeneratedSnapshot = JSON.stringify(instances);
+    lastGeneratedSnapshot = getSnapshot();
     useUrlInput.value = useUrl;
     shortcutUrlInput.value = useUrl;
     bookmarkletLink.href = generateBookmarklet(useUrl);
-    bookmarkletLink.textContent = `${firstInstance.emoji || '⚡'} ${displayName}`;
+    bookmarkletLink.textContent = `${displayEmoji} ${displayName}`;
     staleNotice.style.display = 'none';
     outputSection.style.display = 'block';
     outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });

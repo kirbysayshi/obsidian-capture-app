@@ -113,9 +113,15 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     finishExtraction();
   }
 
-  // ── Apply title/icon from first instance ─────────────────────────────────
+  // ── Apply title/icon — prefer global sn/se, fall back to first instance ──
   const firstInstance = instances[0];
-  applyPageMeta(firstInstance);
+  const globalName = params.get('sn') ?? '';
+  const globalEmoji = params.get('se') ?? '';
+  applyPageMeta({
+    ...firstInstance,
+    name: globalName || firstInstance.name,
+    emoji: globalEmoji || firstInstance.emoji,
+  });
 
   // ── Render skeleton ───────────────────────────────────────────────────────
   root.innerHTML = `
@@ -137,7 +143,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
       <div id="captureForm" style="${instances.length > 1 ? 'display:none' : ''}">
         <h1>
-          Capture
+          <span id="captureTitle">Capture</span>
           <span class="canvas-badge" id="canvasBadge" style="display:none">Canvas</span>
         </h1>
         <p class="vault-info" id="vaultInfo"></p>
@@ -237,9 +243,12 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     const btnCopyDebug = root.querySelector<HTMLButtonElement>('#btnCopyDebug')!;
     const vaultInfo = root.querySelector<HTMLElement>('#vaultInfo')!;
     const canvasBadge = root.querySelector<HTMLElement>('#canvasBadge')!;
+    const captureTitle = root.querySelector<HTMLElement>('#captureTitle')!;
 
     // Apply config to form header
-    vaultInfo.textContent = `→ ${config.vault}${config.folder ? ' / ' + config.folder : ''}`;
+    const titleText = config.emoji ? `${config.emoji} ${config.name || 'Capture'}` : (config.name || 'Capture');
+    captureTitle.textContent = titleText;
+    vaultInfo.innerHTML = `→ ${escHtml(config.vault)}${config.folder ? `<br><span class="vault-folder">${escHtml(config.folder)}</span>` : ''}`;
     canvasBadge.style.display = config.canvas ? '' : 'none';
 
     // Build configure URL (single-instance only — multi-instance uses picker's link)
@@ -345,8 +354,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         filename = `${ts} ${slug}.md`;
       }
 
-      const canvasUrl = extractedUrl || extractUrl(what);
-
       const resolvedProps = config.props.map(prop => {
         if (prop.type !== 'boolean') return prop;
         const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
@@ -362,7 +369,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           bodyText: isBookmarklet ? extractedBodyText : '',
           url: extractedUrl,
         });
-        content = buildCanvasContent(canvasUrl, noteText);
+        const allUrls: string[] = extractedUrl ? [extractedUrl] : [];
+        for (const u of extractAllUrls(what, who, why)) {
+          if (!allUrls.includes(u)) allUrls.push(u);
+        }
+        content = buildCanvasContent(noteText, allUrls);
       } else {
         content = buildNoteContent({
           what,
@@ -427,8 +438,16 @@ function safeDecodeUri(s: string): string {
   try { return decodeURIComponent(s); } catch { return s; }
 }
 
-function extractUrl(text: string): string {
-  return text.match(/https?:\/\/\S+/)?.[0] ?? '';
+function extractAllUrls(...texts: string[]): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const text of texts) {
+    for (const m of text.matchAll(/https?:\/\/\S+/g)) {
+      const url = m[0].replace(/[.,;:!?)]+$/, ''); // strip trailing punctuation
+      if (!seen.has(url)) { seen.add(url); urls.push(url); }
+    }
+  }
+  return urls;
 }
 
 function generateHomeIcon(emoji: string, name: string): void {

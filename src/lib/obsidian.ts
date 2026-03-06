@@ -122,20 +122,50 @@ export function buildCanvasNoteText({
 
 /**
  * Build a canvas note (JSON).
- * - URL + text → link node and text node side-by-side, connected by an edge
- * - URL only  → single link node
- * - Text only → single text node
+ * - Note text node at (0,0) as the anchor
+ * - Each URL becomes a link node arranged in a golden-angle spiral outward from the note
+ * - Edges connect each link node back to the note
  */
-export function buildCanvasContent(url: string, noteText: string): string {
-  const W = 460, H = 360, GAP = 40;
+export function buildCanvasContent(noteText: string, urls: string[] = []): string {
+  const NOTE_W = 460, NOTE_H = 360, LINK_W = 400, LINK_H = 300, GAP = 60;
+  const NOTE_CX = NOTE_W / 2, NOTE_CY = NOTE_H / 2;
+
   const nodes: object[] = [];
   const edges: object[] = [];
 
-  if (url)      nodes.push({ id: '1', type: 'link', url,            x: 0,                   y: 0, width: W, height: H });
-  if (noteText) nodes.push({ id: '2', type: 'text', text: noteText, x: url ? W + GAP : 0,  y: 0, width: W, height: H });
-  if (url && noteText) edges.push({ id: 'e1', fromNode: '1', fromSide: 'right', toNode: '2', toSide: 'left' });
+  if (noteText) {
+    nodes.push({ id: 'note', type: 'text', text: noteText, x: 0, y: 0, width: NOTE_W, height: NOTE_H });
+  }
+
+  // Golden angle spiral: successive nodes spread evenly without clustering
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5)); // ≈ 137.5°
+  const baseRadius = Math.hypot(NOTE_W / 2 + LINK_W / 2 + GAP, NOTE_H / 2);
+
+  urls.forEach((url, i) => {
+    const angle = i * GOLDEN;
+    const radius = baseRadius + i * (LINK_W * 0.4 + GAP);
+    const lx = Math.round(NOTE_CX + radius * Math.cos(angle) - LINK_W / 2);
+    const ly = Math.round(NOTE_CY + radius * Math.sin(angle) - LINK_H / 2);
+    nodes.push({ id: `l${i}`, type: 'link', url, x: lx, y: ly, width: LINK_W, height: LINK_H });
+    if (noteText) {
+      edges.push({
+        id: `e${i}`,
+        fromNode: 'note', fromSide: angleToSide(angle),
+        toNode: `l${i}`, toSide: angleToSide(angle + Math.PI),
+      });
+    }
+  });
 
   return JSON.stringify({ nodes, edges });
+}
+
+function angleToSide(angle: number): 'top' | 'bottom' | 'left' | 'right' {
+  const TWO_PI = Math.PI * 2;
+  const a = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
+  if (a < Math.PI / 4 || a >= 7 * Math.PI / 4) return 'right';
+  if (a < 3 * Math.PI / 4) return 'bottom';
+  if (a < 5 * Math.PI / 4) return 'left';
+  return 'top';
 }
 
 function escapeFrontmatter(str: string): string {

@@ -310,6 +310,27 @@ button.danger {
   color: var(--text);
 }
 
+.instance-sort-btn {
+  flex: 0 0 26px;
+  min-height: unset;
+  height: 28px;
+  width: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.instance-sort-btn:hover {
+  background: transparent;
+  color: var(--text);
+}
+
 .instance-header-label {
   flex: 1;
   font-size: 0.95rem;
@@ -537,6 +558,13 @@ button.danger {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-bottom: 20px;
+  line-height: 1.7;
+}
+
+.vault-folder {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding-left: 12px;
 }
 
 .configure-link {

@@ -68,6 +68,7 @@ test.describe('Stale notice', () => {
   test('hidden after Generate, shown on edit, cleared on revert', async ({ page }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'TestVault');
+    await page.fill('.folder-input', 'Inbox');
     await page.click('#btnGenerate');
     await expect(page.locator('#outputSection')).toBeVisible();
 
@@ -83,6 +84,7 @@ test.describe('Stale notice', () => {
   test('canvas toggle marks and clears stale', async ({ page }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'TestVault');
+    await page.fill('.folder-input', 'Inbox');
     await page.click('#btnGenerate');
 
     await page.click('.canvas-checkbox');
@@ -120,6 +122,7 @@ test.describe('Boolean props — configure view', () => {
   test('default value checkbox is reflected in generated URL', async ({ page }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'Vault');
+    await page.fill('.folder-input', 'Inbox');
     await page.click('.btn-add-prop');
     await page.fill('.prop-key', 'published');
     await page.click('.prop-type-icon');          // switch to boolean
@@ -138,6 +141,7 @@ test.describe('Boolean props — configure view', () => {
   test('stale notice responds to boolean default checkbox change', async ({ page }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'Vault');
+    await page.fill('.folder-input', 'Inbox');
     await page.click('.btn-add-prop');
     await page.fill('.prop-key', 'published');
     await page.click('.prop-type-icon');
@@ -242,6 +246,7 @@ test.describe('Multi-instance configure view', () => {
   test('generate produces URL with instances= param (single instance)', async ({ page }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'Vault');
+    await page.fill('.folder-input', 'Inbox');
     await page.click('#btnGenerate');
 
     const url = await page.locator('#useUrlInput').inputValue();
@@ -255,7 +260,9 @@ test.describe('Multi-instance configure view', () => {
 
     const cards = page.locator('.instance-card');
     await cards.nth(0).locator('.vault-input').fill('VaultA');
+    await cards.nth(0).locator('.folder-input').fill('Inbox');
     await cards.nth(1).locator('.vault-input').fill('VaultB');
+    await cards.nth(1).locator('.folder-input').fill('Inbox');
 
     await page.click('#btnGenerate');
     const url = await page.locator('#useUrlInput').inputValue();
@@ -272,7 +279,9 @@ test.describe('Multi-instance configure view', () => {
 
     const cards = page.locator('.instance-card');
     await cards.nth(0).locator('.vault-input').fill('VaultA');
+    await cards.nth(0).locator('.folder-input').fill('Inbox');
     await cards.nth(1).locator('.vault-input').fill('VaultB');
+    await cards.nth(1).locator('.folder-input').fill('Inbox');
     await page.click('#btnGenerate');
 
     await expect(page.locator('#staleNotice')).toBeHidden();
