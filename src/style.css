@@ -490,8 +490,15 @@ button.danger {
   flex-shrink: 0;
 }
 
-.instance-option-name {
+.instance-option-text {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.instance-option-name {
   font-size: 1rem;
   font-weight: 600;
 }
@@ -499,7 +506,6 @@ button.danger {
 .instance-option-sub {
   font-size: 0.8rem;
   color: var(--text-muted);
-  white-space: nowrap;
 }
 
 .picker-footer {

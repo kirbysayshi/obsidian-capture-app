@@ -131,8 +131,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         ${instances.map((inst, i) => `
           <button class="instance-option" data-index="${i}">
             <span class="instance-option-icon">${escHtml(inst.emoji || '📎')}</span>
-            <span class="instance-option-name">${escHtml(inst.name || 'Capture to Obsidian')}</span>
-            <span class="instance-option-sub">${escHtml(inst.vault)}${inst.folder ? ' / ' + inst.folder : ''}</span>
+            <span class="instance-option-text">
+              <span class="instance-option-name">${escHtml(inst.name || 'Capture to Obsidian')}</span>
+              <span class="instance-option-sub">${escHtml(inst.vault)}${inst.folder ? ' / ' + inst.folder : ''}</span>
+            </span>
           </button>
         `).join('')}
         <div class="picker-footer">
