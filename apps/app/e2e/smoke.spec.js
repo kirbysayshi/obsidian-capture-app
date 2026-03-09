@@ -8,7 +8,7 @@ function ss(testInfo, suffix = '') {
   const safe = testInfo.titlePath
     .join(' - ')
     .replace(/[^a-z0-9\-_. ]/gi, '_');
-  return `test/screenshots/${safe}${suffix ? `-${suffix}` : ''}.png`;
+  return `e2e/screenshots/${safe}${suffix ? `-${suffix}` : ''}.png`;
 }
 
 /** Unicode-safe base64 encode (handles emoji and non-Latin-1). */

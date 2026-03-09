@@ -269,10 +269,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     // Flush buffered debug lines
     debugLog.textContent = debugLines.join('\n') + (debugLines.length ? '\n' : '');
 
-    function dbgEl(...lines: string[]): void {
-      debugLog.textContent += lines.join('\n') + '\n';
-    }
-
     btnCopyDebug.addEventListener('click', (e) => {
       e.preventDefault();
       navigator.clipboard.writeText(debugLog.textContent ?? '').then(() => {

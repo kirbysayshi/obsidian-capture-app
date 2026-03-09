@@ -6,6 +6,6 @@ dist/
 .env.*
 !.env.development
 !.env.production
-e2e/screenshots/*
-!e2e/screenshots/.gitkeep
+apps/app/e2e/screenshots/*
+!apps/app/e2e/screenshots/.gitkeep
 test-results/

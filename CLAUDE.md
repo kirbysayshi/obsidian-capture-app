@@ -1,75 +1,83 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with this repository.
 
-## Commands
+## Layout
 
-```bash
-pnpm dev          # dev server at http://localhost:5174
-pnpm build        # production build → dist/
-pnpm run deploy   # build + push to gh-pages branch (GitHub Pages)
-
-pnpm test                                          # run all tests
-pnpm test test/bookmarklet.spec.js                 # run one file
-pnpm test -- --reporter=line                       # compact output
-pnpm test:ui                                       # interactive UI mode
+```
+apps/app/          Vite SPA — the main capture app (GitHub Pages)
+services/scraper/  Hono/Node.js scraper proxy service (fly.io)
 ```
 
-## Architecture
+## Commands (run from repo root)
 
-Single-page Vite/TypeScript app with no framework. All DOM manipulation is vanilla TS. Deployed to GitHub Pages; config lives entirely in the URL so bookmarks and home screen shortcuts carry all settings without any backend.
+```bash
+pnpm dev                # start Vite (:5174) + scraper (:8080) in parallel
+pnpm build              # build both packages in parallel
+pnpm test               # run all tests (playwright e2e + scraper unit)
+pnpm test:ui            # playwright interactive UI
+pnpm typecheck          # tsc --noEmit across all packages in parallel
+pnpm deploy:app         # build + gh-pages push (GitHub Pages)
+pnpm deploy:scraper     # build + fly deploy (fly.io)
+```
+
+To run tests for one package only:
+```bash
+pnpm --filter @obsidian-capture/app test
+pnpm --filter @obsidian-capture/scraper test
+```
+
+## App architecture (`apps/app/`)
+
+Single-page Vite/TypeScript app, no framework. Config lives entirely in the URL.
 
 ### Routing (`src/main.ts`)
 
-- `?mode=configure` or no `?v=` param → `renderConfigure()`
-- `?v=<vault>` present → `renderUse()`
-- `?mode=bm` added on top of Use view params → bookmarklet iframe mode
+- `?instances=` present → `renderUse()`
+- `?mode=configure` or no `?instances=` → `renderConfigure()`
+- `?mode=bm` on top of Use params → bookmarklet iframe mode
 
 ### URL / Config params
 
 | Param | Meaning |
 |-------|---------|
-| `v` | Vault name |
-| `f` | Target folder |
-| `n` | Shortcut/bookmarklet display name |
-| `e` | Emoji for iOS home screen icon |
-| `canvas` | `1` = canvas mode |
-| `props` | base64-encoded JSON `{k, v, type}[]` for custom frontmatter |
+| `instances` | Unicode-safe base64-encoded JSON array `{vault, folder?, name?, emoji?, canvas?, props?}[]` |
 | `mode` | `configure` or `bm` (bookmarklet iframe) |
+| `su` | Scraper service URL (falls back to `VITE_SCRAPER_URL`) |
+| `ss` | Scraper bearer secret |
 
-`src/lib/config.ts` encodes/decodes between the `Config` interface and URL params.
+Legacy single-instance params (`v`, `f`, `n`, `e`, `canvas`, `props`) are still decoded for configure-view prefill but never generated.
 
 ### Bookmarklet flow
 
-1. User clicks the bookmarklet on any page → `bookmarkletFn` in `src/lib/bookmarklet.ts` injects a fullscreen overlay `<div>` containing an `<iframe>`.
-2. Before building the iframe src, the bookmarklet: strips all `<script>`/`<style>` tags from `outerHTML`; for YouTube pages, extracts a compact subset of `window.ytInitialData` (only the renderers needed for title/channel/description). It then JSON-encodes `{ html, yt? }` and base64-encodes it into the iframe src fragment: `<useUrl>&mode=bm&url=<encoded>&title=<encoded>#<b64>`.
-3. `use.ts` reads `location.hash`, base64-decodes it, JSON-parses the payload, and extracts content: YouTube → `extractFromYtData(yt)` (or `extractYouTubeContent(html)` fallback); all others → `extractContent(html)` via `@mozilla/readability`. The `url` and `title` query params are decoded with `safeDecodeUri()` (double-`decodeURIComponent`) to handle iOS Shortcuts' URL-type conversion re-encoding `%` sequences.
-4. On Save, `use.ts` posts `{ type: 'obsidianUri', url }` to the parent (for testing), then navigates via `window.location.href = obsidian://new?...`.
-5. The parent closes the overlay on `{ type: 'close' }`.
+1. Bookmarklet injects a fullscreen `<iframe>` overlay.
+2. Before building the iframe src, it: strips `<script>`/`<style>` tags; for YouTube, extracts a compact subset of `window.ytInitialData`. JSON-encodes `{ html, yt? }` and base64-encodes into the fragment: `<useUrl>&mode=bm&url=<encoded>&title=<encoded>#<b64>`.
+3. `use.ts` decodes the fragment, extracts content (YouTube via `extractFromYtData`/`extractYouTubeContent`; others via Readability). `url`/`title` params use `safeDecodeUri()` (double-`decodeURIComponent`) for iOS Shortcuts compatibility.
+4. On Save, posts `{ type: 'obsidianUri', url }` to parent (for tests), then navigates via `window.location.href = obsidian://new?...`.
 
-The same fragment schema (`{ html, yt? }` base64 in the URL fragment) is used by the iOS Shortcut path — the Shortcut fetches the page HTML, base64-encodes it as raw HTML (not JSON), and the app's `JSON.parse` fallback in `use.ts` handles it transparently.
+### Scraper
 
-### YouTube extraction (`src/lib/content.ts`)
-
-`ytInitialData` is extracted by finding the `var ytInitialData = ` marker in raw HTML and evaluating it with `new Function()`. This handles both desktop (object literal) and mobile (JS string with hex escapes like `'\x7b...\x7d'`) forms. Desktop uses `twoColumnWatchNextResults`; mobile uses `singleColumnWatchNextResults` with description in `engagementPanels[video-description-ep-identifier]`.
+`src/lib/scraper.ts` — `scrapeUrl(url, config)` fetches HTML via the proxy service. Auto-scrape fires 600ms after URL detected in the `what` field; `#btnFetch` for manual. YouTube detection checks both `result.url` and the original URL passed to `doScrape()`.
 
 ### Note output
 
-- **Markdown**: YAML frontmatter (`created`, `what`, `who`, custom props, `why`) + body text from extraction + `Source:` URL. Filename: `YYYY-MM-DD HH.mm <title slug>.md`.
-- **Canvas**: JSON with a `link` node (if URL present) and/or `text` node side-by-side. Filename: `<title slug>.canvas` (no timestamp).
-- `RESERVED_PROP_KEYS = {'created','what','who','why'}` — custom props with these keys are silently skipped.
+- **Markdown**: YAML frontmatter + body + `Source:` URL. Filename: `YYYY-MM-DD HH.mm <slug>.md`.
+- **Canvas**: JSON with link/text nodes. Filename: `<slug>.canvas` (no timestamp).
+- `RESERVED_PROP_KEYS = {'created','what','who','why'}` — custom props with these keys are skipped.
 
 ### Update check
 
-In production, `main.ts` fetches `./version.json` (emitted by a Vite plugin from the current git hash) and shows a refresh banner if it differs from the build-time constant `__APP_VERSION__`.
+`main.ts` fetches `./version.json` in production and shows a refresh banner if the git hash differs from `__APP_VERSION__`.
 
-### Service worker
+## Scraper service (`services/scraper/`)
 
-`sw.js` (in `public/`) is registered in production only. Playwright config sets `serviceWorkers: 'block'` so it does not interfere with `page.route()` handlers in tests.
+Hono/Node.js proxy. `GET /fetch?url=<url>` returns `{ url, html, title }`. Reads `SCRAPER_SECRET` and `ALLOWED_ORIGIN` env vars dynamically (set via `fly secrets set`). Port 8080. Deployed to fly.io (`fly.toml` in package dir).
 
 ## Tests
 
-- `test/smoke.spec.js` — UI-level tests: configure view, stale notice, boolean props, use view basics.
-- `test/bookmarklet.spec.js` — E2E bookmarklet flow: serves fixture HTML at its real YouTube URL, injects the bookmarklet, waits for content extraction, clicks Save, and asserts the captured `obsidian://` URI.
+- `apps/app/e2e/smoke.spec.js` — UI-level: configure view, stale notice, boolean props, use view, multi-instance.
+- `apps/app/e2e/bookmarklet.spec.js` — E2E bookmarklet: serves fixture HTML, injects bookmarklet, asserts captured `obsidian://` URI.
+- `apps/app/e2e/scraper.spec.js` — scraper integration (requires real scraper on :8080 via playwright webServer).
+- `services/scraper/test/index.test.ts` — 7 unit tests (tsx --test).
 
-Fixtures live in `test/fixtures/`. The `obsidianUri` postMessage (sent by `use.ts` before navigating) is how tests capture the final URI without interception tricks — `page.route` does not intercept custom-protocol navigations and `Location.prototype.href` setter override does not work in Blink.
+Fixtures: `apps/app/e2e/fixtures/`. The `obsidianUri` postMessage from `use.ts` is how tests capture the final URI (custom-protocol navigations can't be intercepted by `page.route`).

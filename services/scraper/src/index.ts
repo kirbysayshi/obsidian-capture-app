@@ -16,7 +16,7 @@ app.use('*', async (c, next) => {
 
 // Preflight
 app.options('/fetch', (c) => {
-  return c.text('', 204);
+  return c.body(null, 204);
 });
 
 app.get('/fetch', async (c) => {

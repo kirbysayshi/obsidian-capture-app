@@ -1,27 +1,14 @@
 {
-  "name": "obsidian-capture-app",
-  "version": "1.0.0",
-  "description": "Capture web content and notes into Obsidian",
+  "name": "obsidian-capture-monorepo",
+  "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "deploy": "pnpm build && gh-pages -d dist",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "dev:scraper": "pnpm --filter @obsidian-capture/scraper dev",
-    "test:scraper": "pnpm --filter @obsidian-capture/scraper test"
+    "dev":            "pnpm -r --parallel run dev",
+    "build":          "pnpm -r --parallel run build",
+    "test":           "pnpm -r --parallel run test",
+    "test:ui":        "pnpm --filter @obsidian-capture/app test:ui",
+    "typecheck":      "pnpm -r --parallel run typecheck",
+    "deploy:app":     "pnpm --filter @obsidian-capture/app deploy",
+    "deploy:scraper": "pnpm --filter @obsidian-capture/scraper deploy"
   },
-  "dependencies": {
-    "@mozilla/readability": "0.6.0"
-  },
-  "devDependencies": {
-    "vite": "7.3.1",
-    "gh-pages": "6.3.0",
-    "@playwright/test": "1.50.1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "packageManager": "pnpm@10.28.2"
 }
