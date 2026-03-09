@@ -1,0 +1,21 @@
+{
+  "name": "@obsidian-capture/scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "tsx --test test/index.test.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "1.19.11",
+    "hono": "4.12.5",
+    "undici": "7.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.21",
+    "tsx": "4.19.4",
+    "typescript": "5.8.3"
+  }
+}

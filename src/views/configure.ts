@@ -16,6 +16,16 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
         <p class="field-hint">Name and icon used for the bookmark button and iOS home screen shortcut. Leave blank to use the first instance.</p>
       </div>
 
+      <div class="field">
+        <label>Scraper service URL</label>
+        <input type="url" id="scraperUrlInput" autocomplete="off">
+        <p class="field-hint">URL of the scraper service used to auto-fetch page content from the home screen app.</p>
+      </div>
+      <div class="field">
+        <label>Scraper secret</label>
+        <input type="password" id="scraperSecretInput" placeholder="Bearer secret" autocomplete="off">
+      </div>
+
       <div id="instancesList"></div>
       <button class="secondary btn-add-instance" id="btnAddInstance" type="button">+ Add instance</button>
 
@@ -66,6 +76,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   const instancesList = root.querySelector<HTMLElement>('#instancesList')!;
   const globalNameInput = root.querySelector<HTMLInputElement>('#globalNameInput')!;
   const globalEmojiInput = root.querySelector<HTMLInputElement>('#globalEmojiInput')!;
+  const scraperUrlInput = root.querySelector<HTMLInputElement>('#scraperUrlInput')!;
+  const scraperSecretInput = root.querySelector<HTMLInputElement>('#scraperSecretInput')!;
   const btnAddInstance = root.querySelector<HTMLButtonElement>('#btnAddInstance')!;
   const btnGenerate = root.querySelector<HTMLButtonElement>('#btnGenerate')!;
   const outputSection = root.querySelector<HTMLElement>('#outputSection')!;
@@ -288,6 +300,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     return JSON.stringify({
       sn: globalNameInput.value.trim(),
       se: globalEmojiInput.value.trim(),
+      su: scraperUrlInput.value.trim(),
+      ss: scraperSecretInput.value.trim(),
       instances: readAllInstances(),
     });
   }
@@ -313,6 +327,9 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   });
 
   // ── Prefill or blank start ────────────────────────────────────────────────
+
+  scraperUrlInput.value = prefill?.get('su') ?? import.meta.env.VITE_SCRAPER_URL ?? '';
+  scraperSecretInput.value = prefill?.get('ss') ?? '';
 
   if (prefill) {
     const sn = prefill.get('sn');
@@ -367,8 +384,12 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     const params = encodeInstances(instances);
     const globalName = globalNameInput.value.trim();
     const globalEmoji = globalEmojiInput.value.trim();
+    const scraperUrl = scraperUrlInput.value.trim();
+    const scraperSecret = scraperSecretInput.value.trim();
     if (globalName) params.set('sn', globalName);
     if (globalEmoji) params.set('se', globalEmoji);
+    if (scraperUrl) params.set('su', scraperUrl);
+    if (scraperSecret) params.set('ss', scraperSecret);
     const useUrl = `${window.location.origin}${window.location.pathname}?${params}`;
     const firstInstance = instances[0];
     const displayName = globalName || firstInstance.name || 'Capture to Obsidian';

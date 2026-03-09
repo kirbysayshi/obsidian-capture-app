@@ -4,6 +4,8 @@ dist/
 *.local
 .env
 .env.*
-test/screenshots/*
-!test/screenshots/.gitkeep
+!.env.development
+!.env.production
+e2e/screenshots/*
+!e2e/screenshots/.gitkeep
 test-results/

@@ -87,6 +87,15 @@ export function decodeInstances(params: URLSearchParams): Config[] | null {
   }
 }
 
+/** Decode global scraper config from URL params (su + ss).
+ *  Falls back to build-time env default for the URL. */
+export function decodeScraperConfig(params: URLSearchParams): { serviceUrl: string; secret: string } {
+  return {
+    serviceUrl: params.get('su') ?? import.meta.env.VITE_SCRAPER_URL ?? '',
+    secret: params.get('ss') ?? '',
+  };
+}
+
 /**
  * Decode a Config from URL search params.
  */

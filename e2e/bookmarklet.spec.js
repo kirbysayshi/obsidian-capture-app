@@ -1,7 +1,7 @@
 /**
  * End-to-end bookmarklet capture flow tests.
  *
- * Fixtures live in test/fixtures/*.md. Each file has two sections:
+ * Fixtures live in e2e/fixtures/*.md. Each file has two sections:
  *   1. YAML frontmatter (name, url, expectContains[])
  *   2. HTML content (served at the fixture's url via page.route)
  *
@@ -18,67 +18,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
-
-// ── Fixture loading ────────────────────────────────────────────────────────────
-
-const VAULT = 'TestVault';
-const FOLDER = 'Inbox';
-const INSTANCES_JSON = JSON.stringify([{ vault: VAULT, folder: FOLDER }]);
-const INSTANCES_PARAM = encodeURIComponent(btoa(
-  Array.from(new TextEncoder().encode(INSTANCES_JSON))
-    .map(b => String.fromCharCode(b))
-    .join(''),
-));
-const CAPTURE_BASE = `http://localhost:5174/?instances=${INSTANCES_PARAM}`;
-const FIXTURES_DIR = 'test/fixtures';
-
-/** Parse a minimal YAML subset: scalar strings and one string-list field. */
-function parseFrontmatter(text) {
-  const fm = {};
-  let currentListKey = null;
-  for (const line of text.split('\n')) {
-    if (!line.trim()) continue;
-    const listItem = line.match(/^  - (.*)$/);
-    if (listItem && currentListKey) {
-      const val = listItem[1];
-      // Strip surrounding single or double quotes used as YAML string delimiters
-      fm[currentListKey].push(
-        (val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))
-          ? val.slice(1, -1)
-          : val,
-      );
-      continue;
-    }
-    currentListKey = null;
-    const scalar = line.match(/^(\w+):\s*(.*)$/);
-    if (scalar) {
-      const [, key, val] = scalar;
-      if (val === '') {
-        fm[key] = [];
-        currentListKey = key;
-      } else {
-        fm[key] = val;
-      }
-    }
-  }
-  return fm;
-}
-
-/** Parse a fixture .md file into { name, url, expectContains, html }. */
-function parseFixture(filePath) {
-  const raw = readFileSync(filePath, 'utf-8');
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) throw new Error(`Invalid fixture format: ${filePath}`);
-  const [, fmText, html] = match;
-  const fm = parseFrontmatter(fmText);
-  return { name: fm.name, url: fm.url, expectContains: fm.expectContains ?? [], html };
-}
-
-const FIXTURES = readdirSync(FIXTURES_DIR)
-  .filter(f => f.endsWith('.md'))
-  .map(f => parseFixture(join(FIXTURES_DIR, f)));
+import { VAULT, FOLDER, CAPTURE_BASE, FIXTURES } from './helpers.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

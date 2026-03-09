@@ -1,4 +1,5 @@
-import { decodeInstances, type Config } from '../lib/config.js';
+import { decodeInstances, decodeScraperConfig, type Config } from '../lib/config.js';
+import { scrapeUrl, extractFirstUrl } from '../lib/scraper.js';
 import {
   buildObsidianUri,
   buildNoteContent,
@@ -14,6 +15,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   if (instances.length === 0) return;
 
   const isBookmarklet = params.get('mode') === 'bm';
+  const scraperConfig = decodeScraperConfig(params);
+  const hasScraperConfig = !!scraperConfig.serviceUrl;
 
   // ── Content extraction (bookmarklet / Shortcuts path) ─────────────────────
   // Start extraction immediately so it runs in parallel with any picker interaction.
@@ -154,7 +157,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         <div class="field">
           <label for="fieldWhat">What</label>
           ${isBookmarklet ? '<div class="loading-indicator" id="loadingIndicator">Extracting page content</div>' : ''}
+          ${!isBookmarklet && hasScraperConfig ? '<div class="loading-indicator" id="loadingIndicator" style="display:none"></div>' : ''}
           <textarea id="fieldWhat" placeholder="URL, title, notes…" rows="6"></textarea>
+          ${!isBookmarklet && hasScraperConfig ? '<button class="secondary" id="btnFetch" type="button" style="display:none">Fetch content</button>' : ''}
         </div>
 
         <div class="field">
@@ -333,6 +338,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         }
         loadingIndicator?.remove();
         fieldWhat.focus();
+      } else if (hasScraperConfig) {
+        if (extractedBodyText) {
+          contentPreviewText.textContent = extractedBodyText;
+          contentPreview.style.display = 'block';
+        }
       }
     }
 
@@ -340,12 +350,90 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       onExtractionDone(populateFromExtraction);
     }
 
+    // ── Scraper auto-fetch (non-bookmarklet path) ─────────────────────────
+    let scrapeTimer: ReturnType<typeof setTimeout> | null = null;
+    const btnFetch = root.querySelector<HTMLButtonElement>('#btnFetch');
+
+    async function doScrape(url: string): Promise<void> {
+      if (loadingIndicator) {
+        loadingIndicator.textContent = 'Fetching page content…';
+        loadingIndicator.style.display = '';
+      }
+      contentPreview.style.display = 'none';
+      try {
+        const result = await scrapeUrl(scraperConfig.serviceUrl, scraperConfig.secret, url);
+        const diag: string[] = [];
+        if (isYouTubeVideo(result.url) || isYouTubeVideo(url)) {
+          const yt = extractYouTubeContent(result.html, diag);
+          extractedTitle = yt?.title || '';
+          if (yt) {
+            const parts: string[] = [];
+            parts.push(`# ${yt.title}`);
+            const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
+            if (channelLine) parts.push(`**Channel:** ${channelLine}`);
+            if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
+            extractedBodyText = parts.join('\n\n');
+          } else {
+            extractedBodyText = '⚠️ Could not extract YouTube metadata.';
+          }
+        } else {
+          const article = extractContent(result.html, result.url);
+          extractedTitle = article?.title?.trim() || '';
+          if (article) {
+            const meta: string[] = [];
+            if (article.byline) meta.push(`By: ${article.byline}`);
+            if (article.siteName) meta.push(`Site: ${article.siteName}`);
+            if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
+            const parts: string[] = [];
+            parts.push(`# ${extractedTitle}`);
+            if (meta.length) parts.push(meta.join(' · '));
+            if (article.excerpt) parts.push(`> ${article.excerpt}`);
+            if (article.textContent) parts.push(article.textContent);
+            extractedBodyText = parts.join('\n\n');
+          } else {
+            // Readability failed — try YouTube extraction as fallback (HTML may contain ytInitialData)
+            const yt = extractYouTubeContent(result.html, diag);
+            if (yt) {
+              extractedTitle = yt.title;
+              const parts: string[] = [];
+              parts.push(`# ${yt.title}`);
+              const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
+              if (channelLine) parts.push(`**Channel:** ${channelLine}`);
+              if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
+              extractedBodyText = parts.join('\n\n');
+            }
+          }
+        }
+        extractedUrl = result.url;
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+        populateFromExtraction();
+      } catch (err) {
+        if (loadingIndicator) {
+          loadingIndicator.textContent = `⚠️ Fetch failed: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      }
+    }
+
+    if (!isBookmarklet && hasScraperConfig && fieldWhat && btnFetch) {
+      fieldWhat.addEventListener('input', () => {
+        const url = extractFirstUrl(fieldWhat.value);
+        if (!url) { btnFetch.style.display = 'none'; return; }
+        btnFetch.style.display = '';
+        if (scrapeTimer) clearTimeout(scrapeTimer);
+        scrapeTimer = setTimeout(() => doScrape(url), 600);
+      });
+      btnFetch.addEventListener('click', () => {
+        const url = extractFirstUrl(fieldWhat.value);
+        if (url) doScrape(url);
+      });
+    }
+
     btnSave.addEventListener('click', () => {
       const what = fieldWhat.value.trim();
       const who = fieldWho.value.trim();
       const why = fieldWhy.value.trim();
 
-      const slugSource = isBookmarklet && extractedTitle ? extractedTitle : what.split('\n')[0] ?? 'capture';
+      const slugSource = (isBookmarklet || hasScraperConfig) && extractedTitle ? extractedTitle : what.split('\n')[0] ?? 'capture';
       const slug = makeReadableSlug(slugSource) || 'capture';
 
       let filename: string;
@@ -368,7 +456,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           what,
           who,
           why,
-          bodyText: isBookmarklet ? extractedBodyText : '',
+          bodyText: (isBookmarklet || hasScraperConfig) ? extractedBodyText : '',
           url: extractedUrl,
         });
         const allUrls: string[] = extractedUrl ? [extractedUrl] : [];
@@ -382,7 +470,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           who,
           why,
           props: resolvedProps,
-          bodyText: isBookmarklet ? extractedBodyText : '',
+          bodyText: (isBookmarklet || hasScraperConfig) ? extractedBodyText : '',
           url: extractedUrl,
         });
       }
