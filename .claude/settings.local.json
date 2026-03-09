@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(pnpm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(xcrun simctl:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(grep:*)",
+      "Bash(git mv:*)",
+      "Bash(./node_modules/.bin/playwright test:*)",
+      "Bash(fly deploy:*)"
+    ]
+  }
+}
