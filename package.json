@@ -9,5 +9,8 @@
     "deploy:app": "pnpm --filter @obsidian-capture/app deploy",
     "deploy:scraper": "pnpm --filter @obsidian-capture/scraper deploy"
   },
-  "packageManager": "pnpm@10.28.2"
+  "packageManager": "pnpm@10.31.0",
+  "volta": {
+    "node": "24.14.0"
+  }
 }
