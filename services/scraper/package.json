@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "test": "tsx --test src/index.test.ts",
     "typecheck": "tsc --noEmit",
-    "deploy": "pnpm build && fly deploy"
+    "deploy": "pnpm build && pnpm --filter=@obsidian-capture/scraper deploy --legacy .deploy && cd .deploy && fly deploy"
   },
   "dependencies": {
     "@hono/node-server": "1.19.11",

@@ -10,3 +10,4 @@ dist/
 apps/app/e2e/screenshots/*
 !apps/app/e2e/screenshots/.gitkeep
 test-results/
+services/scraper/.deploy
