@@ -155,11 +155,13 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         ${instances.length === 1 ? '<a class="configure-link" id="configureLink" href="#">Edit configuration</a>' : ''}
 
         <div class="field">
-          <label for="fieldWhat">What</label>
-          ${isBookmarklet ? '<div class="loading-indicator" id="loadingIndicator">Extracting page content</div>' : ''}
-          ${!isBookmarklet && hasScraperConfig ? '<div class="loading-indicator" id="loadingIndicator" style="display:none"></div>' : ''}
+          <div class="field-label-row">
+            <label for="fieldWhat">What</label>
+            ${isBookmarklet ? '<span class="loading-indicator" id="loadingIndicator">Extracting page content</span>' : ''}
+            ${!isBookmarklet && hasScraperConfig ? '<span class="loading-indicator" id="loadingIndicator" style="visibility:hidden"></span>' : ''}
+            ${!isBookmarklet && hasScraperConfig ? '<button class="btn-fetch" id="btnFetch" type="button" style="visibility:hidden">Fetch</button>' : ''}
+          </div>
           <textarea id="fieldWhat" placeholder="URL, title, notes…" rows="6"></textarea>
-          ${!isBookmarklet && hasScraperConfig ? '<button class="secondary" id="btnFetch" type="button" style="display:none">Fetch content</button>' : ''}
         </div>
 
         <div class="field">
@@ -353,7 +355,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     async function doScrape(url: string): Promise<void> {
       if (loadingIndicator) {
         loadingIndicator.textContent = 'Fetching page content…';
-        loadingIndicator.style.display = '';
+        loadingIndicator.style.visibility = 'visible';
       }
       contentPreview.style.display = 'none';
       try {
@@ -401,7 +403,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           }
         }
         extractedUrl = result.url;
-        if (loadingIndicator) loadingIndicator.style.display = 'none';
+        if (loadingIndicator) loadingIndicator.style.visibility = 'hidden';
         populateFromExtraction();
       } catch (err) {
         if (loadingIndicator) {
@@ -413,8 +415,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     if (!isBookmarklet && hasScraperConfig && fieldWhat && btnFetch) {
       fieldWhat.addEventListener('input', () => {
         const url = extractFirstUrl(fieldWhat.value);
-        if (!url) { btnFetch.style.display = 'none'; return; }
-        btnFetch.style.display = '';
+        if (!url) { btnFetch.style.visibility = 'hidden'; return; }
+        btnFetch.style.visibility = 'visible';
         if (scrapeTimer) clearTimeout(scrapeTimer);
         scrapeTimer = setTimeout(() => doScrape(url), 600);
       });

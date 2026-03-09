@@ -56,7 +56,6 @@ label {
 
 input[type="text"],
 input[type="url"],
-input[type="password"],
 textarea {
   width: 100%;
   background: var(--surface2);
@@ -73,7 +72,6 @@ textarea {
 
 input[type="text"]:focus,
 input[type="url"]:focus,
-input[type="password"]:focus,
 textarea:focus {
   border-color: var(--accent);
 }
@@ -644,24 +642,53 @@ button.danger {
   overflow-y: auto;
 }
 
-.loading-indicator {
-  text-align: center;
-  color: var(--text-muted);
-  padding: 20px 0 8px;
-  font-size: 0.9rem;
+.field-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
-.loading-indicator::after {
+.field-label-row > label {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.loading-indicator {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.loading-indicator:not([style*="hidden"])::after {
   content: '';
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
-  margin-left: 8px;
+  margin-left: 6px;
   vertical-align: middle;
+}
+
+.btn-fetch {
+  min-height: unset;
+  font-size: 0.8rem;
+  font-weight: 400;
+  padding: 2px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-fetch:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 @keyframes spin {

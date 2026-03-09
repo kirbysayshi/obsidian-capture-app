@@ -23,7 +23,7 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       </div>
       <div class="field">
         <label>Scraper secret</label>
-        <input type="password" id="scraperSecretInput" placeholder="Bearer secret" autocomplete="off">
+        <input type="text" id="scraperSecretInput" placeholder="Bearer secret" autocomplete="off">
       </div>
 
       <div id="instancesList"></div>
