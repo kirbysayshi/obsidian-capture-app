@@ -22,6 +22,7 @@ pnpm deploy:scraper     # build + fly deploy (fly.io)
 ```
 
 To run tests for one package only:
+
 ```bash
 pnpm --filter @obsidian-capture/app test
 pnpm --filter @obsidian-capture/scraper test
@@ -39,12 +40,12 @@ Single-page Vite/TypeScript app, no framework. Config lives entirely in the URL.
 
 ### URL / Config params
 
-| Param | Meaning |
-|-------|---------|
+| Param       | Meaning                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------- |
 | `instances` | Unicode-safe base64-encoded JSON array `{vault, folder?, name?, emoji?, canvas?, props?}[]` |
-| `mode` | `configure` or `bm` (bookmarklet iframe) |
-| `su` | Scraper service URL (falls back to `VITE_SCRAPER_URL`) |
-| `ss` | Scraper bearer secret |
+| `mode`      | `configure` or `bm` (bookmarklet iframe)                                                    |
+| `su`        | Scraper service URL (falls back to `VITE_SCRAPER_URL`)                                      |
+| `ss`        | Scraper bearer secret                                                                       |
 
 Legacy single-instance params (`v`, `f`, `n`, `e`, `canvas`, `props`) are still decoded for configure-view prefill but never generated.
 
@@ -75,9 +76,10 @@ Hono/Node.js proxy. `GET /fetch?url=<url>` returns `{ url, html, title }`. Reads
 
 ## Tests
 
-- `apps/app/e2e/smoke.spec.js` — UI-level: configure view, stale notice, boolean props, use view, multi-instance.
-- `apps/app/e2e/bookmarklet.spec.js` — E2E bookmarklet: serves fixture HTML, injects bookmarklet, asserts captured `obsidian://` URI.
-- `apps/app/e2e/scraper.spec.js` — scraper integration (requires real scraper on :8080 via playwright webServer).
-- `services/scraper/test/index.test.ts` — 7 unit tests (tsx --test).
+Tests should be colocated with the code they are testing. The exception is e2e tests, which are in an e2e folder.
 
-Fixtures: `apps/app/e2e/fixtures/`. The `obsidianUri` postMessage from `use.ts` is how tests capture the final URI (custom-protocol navigations can't be intercepted by `page.route`).
+Always ensure all tests pass before commiting code.
+
+## Commits
+
+Write commit messages, PR titles, and PR descriptions as a humble but experienced engineer. Keep it casual, but terse. Avoid listing out implementation details. Highlight non-obvious implementation choices.

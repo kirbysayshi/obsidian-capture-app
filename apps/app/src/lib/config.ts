@@ -92,7 +92,7 @@ export function decodeInstances(params: URLSearchParams): Config[] | null {
 export function decodeScraperConfig(params: URLSearchParams): { serviceUrl: string; secret: string } {
   return {
     serviceUrl: params.get('su') ?? import.meta.env.VITE_SCRAPER_URL ?? '',
-    secret: params.get('ss') ?? '',
+    secret: params.get('ss') ?? import.meta.env.VITE_SCRAPER_SECRET ?? '',
   };
 }
 

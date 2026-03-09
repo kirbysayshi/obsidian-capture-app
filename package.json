@@ -2,12 +2,11 @@
   "name": "obsidian-capture-monorepo",
   "private": true,
   "scripts": {
-    "dev":            "pnpm -r --parallel run dev",
-    "build":          "pnpm -r --parallel run build",
-    "test":           "pnpm -r --parallel run test",
-    "test:ui":        "pnpm --filter @obsidian-capture/app test:ui",
-    "typecheck":      "pnpm -r --parallel run typecheck",
-    "deploy:app":     "pnpm --filter @obsidian-capture/app deploy",
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r --parallel run build",
+    "test": "pnpm -r --parallel run test",
+    "typecheck": "pnpm -r --parallel run typecheck",
+    "deploy:app": "pnpm --filter @obsidian-capture/app deploy",
     "deploy:scraper": "pnpm --filter @obsidian-capture/scraper deploy"
   },
   "packageManager": "pnpm@10.28.2"
