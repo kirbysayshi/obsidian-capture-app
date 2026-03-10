@@ -6,8 +6,8 @@
     "build": "pnpm -r --parallel run build",
     "test": "pnpm -r --parallel run test",
     "typecheck": "pnpm -r --parallel run typecheck",
-    "deploy:app": "pnpm --filter @obsidian-capture/app deploy",
-    "deploy:scraper": "pnpm --filter @obsidian-capture/scraper deploy"
+    "deploy:app": "pnpm --filter @obsidian-capture/app run deploy",
+    "deploy:scraper": "pnpm --filter @obsidian-capture/scraper run deploy"
   },
   "packageManager": "pnpm@10.31.0",
   "volta": {

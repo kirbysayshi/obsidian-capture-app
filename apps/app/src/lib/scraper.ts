@@ -17,3 +17,14 @@ export function extractFirstUrl(text: string): string | null {
   const m = text.match(/https?:\/\/\S+/);
   return m ? m[0].replace(/[.,;:!?)]+$/, '') : null;
 }
+
+/** Return all http/https URLs from text, deduped, stripping trailing punctuation. */
+export function extractAllUrls(text: string): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const m of text.matchAll(/https?:\/\/\S+/g)) {
+    const url = m[0].replace(/[.,;:!?)]+$/, '');
+    if (!seen.has(url)) { seen.add(url); urls.push(url); }
+  }
+  return urls;
+}

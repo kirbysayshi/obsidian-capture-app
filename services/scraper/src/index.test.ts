@@ -138,32 +138,37 @@ describe("Scraper service", () => {
   it("7. upstream redirect → 200, url = final URL", async () => {
     mockStatusCode = 200;
     mockBody = "<html><body>Final destination</body></html>";
-    // Set up redirect: /redirect → /page
     mockRedirectTarget = "";
-    const redirectPort = await new Promise<number>((resolve) => {
-      const srv = http.createServer((req, res) => {
-        if (req.url === "/redirect") {
-          res.writeHead(301, { Location: mockUrl() });
-          res.end();
-        } else {
-          res.writeHead(200, { "Content-Type": "text/html" });
-          res.end("<html><body>Final destination</body></html>");
-          srv.close();
-        }
+
+    // Temporary server that redirects /redirect → mockUrl()
+    const { server: redirectServer, port: redirectPort } = await new Promise<{
+      server: http.Server;
+      port: number;
+    }>((resolve) => {
+      const server = http.createServer((req, res) => {
+        res.writeHead(301, { Location: mockUrl() });
+        res.end();
       });
-      srv.listen(0, "127.0.0.1", () =>
-        resolve((srv.address() as { port: number }).port),
+      server.listen(0, "127.0.0.1", () =>
+        resolve({ server, port: (server.address() as { port: number }).port }),
       );
     });
 
-    const redirectUrl = `http://127.0.0.1:${redirectPort}/redirect`;
-    const resp = await scraperFetch(redirectUrl, {
-      Authorization: "Bearer test-secret",
-    });
-    assert.equal(resp.status, 200);
-    const body = (await resp.json()) as { html: string; url: string };
-    assert.ok(body.html.includes("Final destination"));
-    // Final URL should differ from the original redirect URL
-    assert.notEqual(body.url, redirectUrl);
+    try {
+      const redirectUrl = `http://127.0.0.1:${redirectPort}/redirect`;
+      const resp = await scraperFetch(redirectUrl, {
+        Authorization: "Bearer test-secret",
+      });
+      assert.equal(resp.status, 200);
+      const body = (await resp.json()) as { html: string; url: string };
+      assert.ok(body.html.includes("Final destination"));
+      // Final URL should differ from the original redirect URL
+      assert.notEqual(body.url, redirectUrl);
+    } finally {
+      await new Promise<void>((resolve) => {
+        redirectServer.closeAllConnections?.();
+        redirectServer.close(() => resolve());
+      });
+    }
   });
 });

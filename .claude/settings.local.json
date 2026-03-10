@@ -14,7 +14,9 @@
       "Bash(grep:*)",
       "Bash(git mv:*)",
       "Bash(./node_modules/.bin/playwright test:*)",
-      "Bash(fly deploy:*)"
+      "Bash(fly deploy:*)",
+      "WebSearch",
+      "Bash(cat:*)"
     ]
   }
 }

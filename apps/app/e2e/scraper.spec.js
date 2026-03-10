@@ -63,8 +63,8 @@ test.describe('Scraper auto-fetch flow', () => {
       const targetUrl = `http://127.0.0.1:${fixturePort}/${slug}`;
       await page.fill('#fieldWhat', targetUrl);
 
-      // Wait for content extraction to complete (preview appears)
-      await expect(page.locator('#contentPreview')).toBeVisible({ timeout: 15_000 });
+      // Wait for content extraction to complete (entry transitions to done)
+      await expect(page.locator('.scrape-entry--done')).toBeVisible({ timeout: 15_000 });
 
       // Click Save
       await page.locator('#btnSave').click();
@@ -78,4 +78,67 @@ test.describe('Scraper auto-fetch flow', () => {
       expect(params.get('file')).toMatch(/\.md$/);
     });
   }
+});
+
+test.describe('Multi-URL scrape list', () => {
+  test('two URLs → two entries, no auto-scrape', async ({ page }) => {
+    await page.goto(CAPTURE_BASE);
+
+    const slug = FIXTURES[0].name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const url1 = `http://127.0.0.1:${fixturePort}/${slug}`;
+    const url2 = `http://127.0.0.1:${fixturePort}/second`;
+    await page.fill('#fieldWhat', `${url1}\n${url2}`);
+
+    // Two entries appear immediately
+    await expect(page.locator('.scrape-entry')).toHaveCount(2);
+    // Neither is done (no auto-scrape for multiple URLs)
+    await expect(page.locator('.scrape-entry--done')).toHaveCount(0);
+  });
+
+  test('clicking pending entry header triggers scrape', async ({ page }) => {
+    await page.goto(CAPTURE_BASE);
+
+    const slug = FIXTURES[0].name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const url1 = `http://127.0.0.1:${fixturePort}/${slug}`;
+    const url2 = `http://127.0.0.1:${fixturePort}/second`;
+    await page.fill('#fieldWhat', `${url1}\n${url2}`);
+
+    // Click the first pending entry header
+    await page.locator('.scrape-entry--pending .scrape-entry-header--clickable').first().click();
+
+    // First entry transitions to done
+    await expect(page.locator('.scrape-entry--done')).toHaveCount(1, { timeout: 15_000 });
+    // Second entry remains pending
+    await expect(page.locator('.scrape-entry--pending')).toHaveCount(1);
+  });
+
+  test('exclude button grays out entry', async ({ page }) => {
+    await page.goto(CAPTURE_BASE);
+
+    const slug = FIXTURES[0].name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const targetUrl = `http://127.0.0.1:${fixturePort}/${slug}`;
+    await page.fill('#fieldWhat', targetUrl);
+
+    // Wait for auto-scrape to finish
+    await expect(page.locator('.scrape-entry--done')).toBeVisible({ timeout: 15_000 });
+
+    // Click exclude
+    await page.locator('.btn-exclude-entry').click();
+    await expect(page.locator('.scrape-entry--excluded')).toBeVisible();
+
+    // Undo button appears (↩)
+    await expect(page.locator('.btn-exclude-entry[data-action="include"]')).toBeVisible();
+  });
+
+  test('error state shows retry button', async ({ page }) => {
+    await page.goto(CAPTURE_BASE);
+
+    // URL that returns 404 from fixture server → scraper error
+    const badUrl = `http://127.0.0.1:${fixturePort}/does-not-exist`;
+    await page.fill('#fieldWhat', badUrl);
+
+    // Auto-scrape fires, gets 404, transitions to error
+    await expect(page.locator('.scrape-entry--error')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.btn-retry-entry')).toBeVisible();
+  });
 });

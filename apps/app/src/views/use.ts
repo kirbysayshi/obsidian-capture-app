@@ -1,5 +1,5 @@
 import { decodeInstances, decodeScraperConfig, type Config } from '../lib/config.js';
-import { scrapeUrl, extractFirstUrl } from '../lib/scraper.js';
+import { scrapeUrl, extractAllUrls } from '../lib/scraper.js';
 import {
   buildObsidianUri,
   buildNoteContent,
@@ -10,6 +10,17 @@ import {
 } from '../lib/obsidian.js';
 import { extractContent, extractYouTubeContent, extractFromYtData, isYouTubeVideo } from '../lib/content.js';
 
+type ScrapeStatus = 'pending' | 'loading' | 'done' | 'error';
+interface ScrapeEntry {
+  id: string;
+  url: string;
+  status: ScrapeStatus;
+  bodyText: string;
+  title: string;
+  errorMsg: string;
+  excluded: boolean;
+}
+
 export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const instances = decodeInstances(params) ?? [];
   if (instances.length === 0) return;
@@ -19,8 +30,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const hasScraperConfig = !!scraperConfig.serviceUrl;
 
   // ── Content extraction (bookmarklet / Shortcuts path) ─────────────────────
-  // Start extraction immediately so it runs in parallel with any picker interaction.
-
   let extractedUrl = '';
   let extractedBodyText = '';
   let extractedTitle = '';
@@ -116,7 +125,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     finishExtraction();
   }
 
-  // ── Apply title/icon — prefer global sn/se, fall back to first instance ──
+  // ── Apply title/icon ───────────────────────────────────────────────────────
   const firstInstance = instances[0];
   const globalName = params.get('sn') ?? '';
   const globalEmoji = params.get('se') ?? '';
@@ -126,7 +135,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     emoji: globalEmoji || firstInstance.emoji,
   });
 
-  // ── Render skeleton ───────────────────────────────────────────────────────
+  // ── Render skeleton ────────────────────────────────────────────────────────
   root.innerHTML = `
     <div class="use-view">
       <div id="instancePicker" class="instance-picker" style="${instances.length === 1 ? 'display:none' : ''}">
@@ -158,8 +167,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           <div class="field-label-row">
             <label for="fieldWhat">What</label>
             ${isBookmarklet ? '<span class="loading-indicator" id="loadingIndicator">Extracting page content</span>' : ''}
-            ${!isBookmarklet && hasScraperConfig ? '<span class="loading-indicator" id="loadingIndicator" style="visibility:hidden"></span>' : ''}
-            ${!isBookmarklet && hasScraperConfig ? '<button class="btn-fetch" id="btnFetch" type="button" style="visibility:hidden">Fetch</button>' : ''}
           </div>
           <textarea id="fieldWhat" placeholder="URL, title, notes…" rows="6"></textarea>
         </div>
@@ -176,15 +183,18 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
         <div id="boolPropsSection"></div>
 
+        ${!isBookmarklet && hasScraperConfig ? '<div id="scrapeList" class="scrape-list"></div>' : ''}
+
         <div class="btn-row">
           <button class="btn-save" id="btnSave">Save to Obsidian</button>
           <button class="btn-cancel secondary" id="btnCancel">Cancel</button>
         </div>
 
+        ${isBookmarklet ? `
         <div id="contentPreview" class="content-preview" style="display:none">
           <label>Clipped content</label>
           <pre id="contentPreviewText"></pre>
-        </div>
+        </div>` : ''}
 
         <details id="debugDetails" class="debug-details">
           <summary>Debug <button id="btnCopyDebug" class="debug-copy-btn" type="button">Copy</button></summary>
@@ -194,14 +204,13 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     </div>
   `;
 
-  // ── Picker interaction ────────────────────────────────────────────────────
+  // ── Picker interaction ─────────────────────────────────────────────────────
   const instancePicker = root.querySelector<HTMLElement>('#instancePicker')!;
   const captureForm = root.querySelector<HTMLElement>('#captureForm')!;
 
   let activeConfig: Config = firstInstance;
   const isMultiInstance = instances.length > 1;
 
-  // ── Picker cancel + configure link ───────────────────────────────────────
   if (isMultiInstance) {
     const configureParams = new URLSearchParams(params);
     configureParams.delete('mode');
@@ -221,7 +230,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   }
 
   if (instances.length === 1) {
-    // Skip picker — go straight to form
     showForm(firstInstance);
   } else {
     instancePicker.querySelectorAll<HTMLButtonElement>('.instance-option').forEach(btn => {
@@ -236,15 +244,183 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     });
   }
 
-  // ── showForm: wire up form for a selected config ──────────────────────────
+  // ── Scrape entry state (non-bookmarklet) ───────────────────────────────────
+  let scrapeEntries: ScrapeEntry[] = [];
+  let scrapeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function reconcileScrapeEntries(urls: string[]): void {
+    const existingMap = new Map(scrapeEntries.map(e => [e.url, e]));
+    scrapeEntries = urls.map(url => {
+      if (existingMap.has(url)) return existingMap.get(url)!;
+      return {
+        id: `entry-${Math.random().toString(36).slice(2)}`,
+        url,
+        status: 'pending',
+        bodyText: '',
+        title: '',
+        errorMsg: '',
+        excluded: false,
+      };
+    });
+    renderScrapeList();
+  }
+
+  async function doScrapeEntry(entry: ScrapeEntry): Promise<void> {
+    entry.status = 'loading';
+    renderScrapeList();
+    try {
+      const result = await scrapeUrl(scraperConfig.serviceUrl, scraperConfig.secret, entry.url);
+      const diag: string[] = [];
+      if (isYouTubeVideo(result.url) || isYouTubeVideo(entry.url)) {
+        const yt = extractYouTubeContent(result.html, diag);
+        entry.title = yt?.title || '';
+        if (yt) {
+          const parts: string[] = [];
+          parts.push(`# ${yt.title}`);
+          const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
+          if (channelLine) parts.push(`**Channel:** ${channelLine}`);
+          if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
+          entry.bodyText = parts.join('\n\n');
+        } else {
+          entry.bodyText = '⚠️ Could not extract YouTube metadata.';
+        }
+      } else {
+        const article = extractContent(result.html, result.url);
+        entry.title = article?.title?.trim() || '';
+        if (article) {
+          const meta: string[] = [];
+          if (article.byline) meta.push(`By: ${article.byline}`);
+          if (article.siteName) meta.push(`Site: ${article.siteName}`);
+          if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
+          const parts: string[] = [];
+          parts.push(`# ${entry.title}`);
+          if (meta.length) parts.push(meta.join(' · '));
+          if (article.excerpt) parts.push(`> ${article.excerpt}`);
+          if (article.textContent) parts.push(article.textContent);
+          entry.bodyText = parts.join('\n\n');
+        } else {
+          const yt = extractYouTubeContent(result.html, diag);
+          if (yt) {
+            entry.title = yt.title;
+            const parts: string[] = [];
+            parts.push(`# ${yt.title}`);
+            const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
+            if (channelLine) parts.push(`**Channel:** ${channelLine}`);
+            if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
+            entry.bodyText = parts.join('\n\n');
+          }
+        }
+      }
+      entry.url = result.url;
+      entry.status = 'done';
+    } catch (err) {
+      entry.status = 'error';
+      entry.errorMsg = err instanceof Error ? err.message : String(err);
+    }
+    renderScrapeList();
+  }
+
+  function renderScrapeList(): void {
+    const list = root.querySelector<HTMLElement>('#scrapeList');
+    if (!list) return;
+
+    if (scrapeEntries.length === 0) {
+      list.innerHTML = '';
+      return;
+    }
+
+    list.innerHTML = scrapeEntries.map(entry => {
+      const urlDisplay = escHtml(entry.url.replace(/^https?:\/\//, '').slice(0, 80));
+
+      let statusIcon = '';
+      let statusClass = '';
+      if (entry.status === 'pending') {
+        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--pending">○</span>`;
+        statusClass = 'scrape-entry--pending';
+      } else if (entry.status === 'loading') {
+        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--loading"></span>`;
+        statusClass = 'scrape-entry--loading';
+      } else if (entry.status === 'done') {
+        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--done">✓</span>`;
+        statusClass = 'scrape-entry--done';
+      } else {
+        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--error">⚠</span>`;
+        statusClass = 'scrape-entry--error';
+      }
+
+      const excludeBtn = entry.excluded
+        ? `<button class="btn-exclude-entry" data-action="include" data-id="${entry.id}" title="Re-include">↩</button>`
+        : `<button class="btn-exclude-entry" data-action="exclude" data-id="${entry.id}" title="Exclude">✕</button>`;
+
+      const fetchBtn = entry.status === 'pending'
+        ? `<button class="btn-scrape-entry" data-id="${entry.id}" type="button">Fetch</button>`
+        : entry.status === 'error'
+          ? `<button class="btn-retry-entry" data-id="${entry.id}" type="button">Retry</button>`
+          : '';
+
+      const preview = entry.status === 'done' && !entry.excluded && entry.bodyText
+        ? `<details class="scrape-entry-preview">
+            <summary>Clipped content</summary>
+            <pre>${escHtml(entry.bodyText.slice(0, 500))}${entry.bodyText.length > 500 ? '…' : ''}</pre>
+          </details>`
+        : '';
+
+      const errorMsg = entry.status === 'error'
+        ? `<div class="scrape-entry-error">${escHtml(entry.errorMsg)}</div>`
+        : '';
+
+      const entryClass = ['scrape-entry', statusClass, entry.excluded ? 'scrape-entry--excluded' : ''].filter(Boolean).join(' ');
+      const isClickable = entry.status === 'pending' && !entry.excluded;
+      const headerClass = isClickable ? 'scrape-entry-header scrape-entry-header--clickable' : 'scrape-entry-header';
+
+      return `<div class="${entryClass}" data-id="${entry.id}">
+        <div class="${headerClass}" data-fetch="${isClickable ? entry.id : ''}">
+          ${statusIcon}
+          <span class="scrape-entry-url" title="${escHtml(entry.url)}">${urlDisplay}</span>
+          ${fetchBtn}
+          ${excludeBtn}
+        </div>
+        ${errorMsg}
+        ${preview}
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll<HTMLButtonElement>('.btn-scrape-entry, .btn-retry-entry').forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const entry = scrapeEntries.find(e => e.id === btn.dataset.id);
+        if (entry && entry.status !== 'loading') void doScrapeEntry(entry);
+      });
+    });
+
+    list.querySelectorAll<HTMLButtonElement>('.btn-exclude-entry').forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const entry = scrapeEntries.find(e => e.id === btn.dataset.id);
+        if (entry) {
+          entry.excluded = btn.dataset.action === 'exclude';
+          renderScrapeList();
+        }
+      });
+    });
+
+    list.querySelectorAll<HTMLElement>('.scrape-entry-header--clickable').forEach(header => {
+      header.addEventListener('click', () => {
+        const entry = scrapeEntries.find(e => e.id === header.dataset.fetch);
+        if (entry && entry.status === 'pending') void doScrapeEntry(entry);
+      });
+    });
+  }
+
+  // ── showForm: wire up form for a selected config ───────────────────────────
   function showForm(config: Config): void {
     const fieldWhat = root.querySelector<HTMLTextAreaElement>('#fieldWhat')!;
     const fieldWho = root.querySelector<HTMLInputElement>('#fieldWho')!;
     const fieldWhy = root.querySelector<HTMLTextAreaElement>('#fieldWhy')!;
     const btnSave = root.querySelector<HTMLButtonElement>('#btnSave')!;
     const loadingIndicator = root.querySelector<HTMLElement>('#loadingIndicator');
-    const contentPreview = root.querySelector<HTMLElement>('#contentPreview')!;
-    const contentPreviewText = root.querySelector<HTMLElement>('#contentPreviewText')!;
+    const contentPreview = root.querySelector<HTMLElement>('#contentPreview');
+    const contentPreviewText = root.querySelector<HTMLElement>('#contentPreviewText');
     const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
     const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink');
     const boolPropsSection = root.querySelector<HTMLElement>('#boolPropsSection')!;
@@ -254,13 +430,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     const canvasBadge = root.querySelector<HTMLElement>('#canvasBadge')!;
     const captureTitle = root.querySelector<HTMLElement>('#captureTitle')!;
 
-    // Apply config to form header
     const titleText = config.emoji ? `${config.emoji} ${config.name || 'Capture'}` : (config.name || 'Capture');
     captureTitle.textContent = titleText;
     vaultInfo.innerHTML = `→ ${escHtml(config.vault)}${config.folder ? `<br><span class="vault-folder">${escHtml(config.folder)}</span>` : ''}`;
     canvasBadge.style.display = config.canvas ? '' : 'none';
 
-    // Build configure URL (single-instance only — multi-instance uses picker's link)
     if (configureLink) {
       const configureParams = new URLSearchParams(params);
       configureParams.delete('mode');
@@ -268,7 +442,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       configureLink.href = `${window.location.pathname}?${configureParams}`;
     }
 
-    // Flush buffered debug lines
     debugLog.textContent = debugLines.join('\n') + (debugLines.length ? '\n' : '');
 
     btnCopyDebug.addEventListener('click', (e) => {
@@ -285,7 +458,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       });
     });
 
-    // Render boolean props as checkboxes
     boolPropsSection.innerHTML = '';
     const booleanProps = config.props.filter(p => p.type === 'boolean');
     for (const prop of booleanProps) {
@@ -304,8 +476,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       fieldWhat.value = '';
       fieldWho.value = '';
       fieldWhy.value = '';
-      contentPreview.style.display = 'none';
-      contentPreviewText.textContent = '';
+      scrapeEntries = [];
+      renderScrapeList();
+      if (contentPreview) contentPreview.style.display = 'none';
+      if (contentPreviewText) contentPreviewText.textContent = '';
       for (const prop of booleanProps) {
         const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
         if (cb) cb.checked = prop.v === 'true';
@@ -314,7 +488,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
     btnCancel.addEventListener('click', () => {
       if (isMultiInstance) {
-        // Return to the picker
         captureForm.style.display = 'none';
         instancePicker.style.display = '';
       } else if (isBookmarklet) {
@@ -326,21 +499,15 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       }
     });
 
-    // Populate form once extraction is done
     function populateFromExtraction(): void {
       if (isBookmarklet) {
         fieldWhat.value = extractedUrl;
-        if (extractedBodyText) {
+        if (extractedBodyText && contentPreviewText && contentPreview) {
           contentPreviewText.textContent = extractedBodyText;
           contentPreview.style.display = 'block';
         }
         loadingIndicator?.remove();
         fieldWhat.focus();
-      } else if (hasScraperConfig) {
-        if (extractedBodyText) {
-          contentPreviewText.textContent = extractedBodyText;
-          contentPreview.style.display = 'block';
-        }
       }
     }
 
@@ -348,92 +515,56 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       onExtractionDone(populateFromExtraction);
     }
 
-    // ── Scraper auto-fetch (non-bookmarklet path) ─────────────────────────
-    let scrapeTimer: ReturnType<typeof setTimeout> | null = null;
-    const btnFetch = root.querySelector<HTMLButtonElement>('#btnFetch');
-
-    async function doScrape(url: string): Promise<void> {
-      if (loadingIndicator) {
-        loadingIndicator.textContent = 'Fetching page content…';
-        loadingIndicator.style.visibility = 'visible';
-      }
-      contentPreview.style.display = 'none';
-      try {
-        const result = await scrapeUrl(scraperConfig.serviceUrl, scraperConfig.secret, url);
-        const diag: string[] = [];
-        if (isYouTubeVideo(result.url) || isYouTubeVideo(url)) {
-          const yt = extractYouTubeContent(result.html, diag);
-          extractedTitle = yt?.title || '';
-          if (yt) {
-            const parts: string[] = [];
-            parts.push(`# ${yt.title}`);
-            const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
-            if (channelLine) parts.push(`**Channel:** ${channelLine}`);
-            if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
-            extractedBodyText = parts.join('\n\n');
-          } else {
-            extractedBodyText = '⚠️ Could not extract YouTube metadata.';
-          }
-        } else {
-          const article = extractContent(result.html, result.url);
-          extractedTitle = article?.title?.trim() || '';
-          if (article) {
-            const meta: string[] = [];
-            if (article.byline) meta.push(`By: ${article.byline}`);
-            if (article.siteName) meta.push(`Site: ${article.siteName}`);
-            if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
-            const parts: string[] = [];
-            parts.push(`# ${extractedTitle}`);
-            if (meta.length) parts.push(meta.join(' · '));
-            if (article.excerpt) parts.push(`> ${article.excerpt}`);
-            if (article.textContent) parts.push(article.textContent);
-            extractedBodyText = parts.join('\n\n');
-          } else {
-            // Readability failed — try YouTube extraction as fallback (HTML may contain ytInitialData)
-            const yt = extractYouTubeContent(result.html, diag);
-            if (yt) {
-              extractedTitle = yt.title;
-              const parts: string[] = [];
-              parts.push(`# ${yt.title}`);
-              const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
-              if (channelLine) parts.push(`**Channel:** ${channelLine}`);
-              if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
-              extractedBodyText = parts.join('\n\n');
-            }
-          }
-        }
-        extractedUrl = result.url;
-        if (loadingIndicator) loadingIndicator.style.visibility = 'hidden';
-        populateFromExtraction();
-      } catch (err) {
-        if (loadingIndicator) {
-          loadingIndicator.textContent = `⚠️ Fetch failed: ${err instanceof Error ? err.message : String(err)}`;
-        }
-      }
-    }
-
-    if (!isBookmarklet && hasScraperConfig && fieldWhat && btnFetch) {
+    // ── Scraper input handler (non-bookmarklet) ───────────────────────────────
+    if (!isBookmarklet && hasScraperConfig) {
       fieldWhat.addEventListener('input', () => {
-        const url = extractFirstUrl(fieldWhat.value);
-        if (!url) { btnFetch.style.visibility = 'hidden'; return; }
-        btnFetch.style.visibility = 'visible';
+        const urls = extractAllUrls(fieldWhat.value);
+        reconcileScrapeEntries(urls);
         if (scrapeTimer) clearTimeout(scrapeTimer);
-        scrapeTimer = setTimeout(() => doScrape(url), 600);
-      });
-      btnFetch.addEventListener('click', () => {
-        const url = extractFirstUrl(fieldWhat.value);
-        if (url) doScrape(url);
+        if (urls.length === 1 && scrapeEntries[0]?.status === 'pending') {
+          scrapeTimer = setTimeout(() => void doScrapeEntry(scrapeEntries[0]), 600);
+        }
       });
     }
 
+    // ── Save handler ───────────────────────────────────────────────────────────
     btnSave.addEventListener('click', () => {
       const what = fieldWhat.value.trim();
       const who = fieldWho.value.trim();
       const why = fieldWhy.value.trim();
 
-      const slugSource = (isBookmarklet || hasScraperConfig) && extractedTitle ? extractedTitle : what.split('\n')[0] ?? 'capture';
-      const slug = makeReadableSlug(slugSource) || 'capture';
+      let slugSource: string;
+      let bodyText: string;
+      let primaryUrl: string;
 
+      if (isBookmarklet) {
+        slugSource = extractedTitle || (what.split('\n')[0] ?? 'capture');
+        bodyText = extractedBodyText;
+        primaryUrl = extractedUrl;
+      } else if (hasScraperConfig) {
+        const doneEntries = scrapeEntries.filter(e => e.status === 'done' && !e.excluded);
+        const firstTitle = doneEntries[0]?.title || '';
+        slugSource = firstTitle || (what.split('\n')[0] ?? 'capture');
+
+        let aggregatedBody = doneEntries.map(e => e.bodyText).filter(Boolean).join('\n\n---\n\n');
+        if (doneEntries.length === 1) {
+          primaryUrl = doneEntries[0].url;
+        } else if (doneEntries.length > 1) {
+          const sources = doneEntries.map(e => `- ${e.url}`).join('\n');
+          if (aggregatedBody) aggregatedBody += '\n\n';
+          aggregatedBody += `Sources:\n${sources}`;
+          primaryUrl = '';
+        } else {
+          primaryUrl = '';
+        }
+        bodyText = aggregatedBody;
+      } else {
+        slugSource = what.split('\n')[0] ?? 'capture';
+        bodyText = '';
+        primaryUrl = '';
+      }
+
+      const slug = makeReadableSlug(slugSource) || 'capture';
       let filename: string;
       if (config.canvas) {
         filename = `${slug}.canvas`;
@@ -454,22 +585,27 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           what,
           who,
           why,
-          bodyText: (isBookmarklet || hasScraperConfig) ? extractedBodyText : '',
-          url: extractedUrl,
+          bodyText,
+          url: primaryUrl,
         });
-        const allUrls: string[] = extractedUrl ? [extractedUrl] : [];
-        for (const u of extractAllUrls(what, who, why)) {
-          if (!allUrls.includes(u)) allUrls.push(u);
+        let canvasUrls: string[];
+        if (hasScraperConfig && scrapeEntries.length > 0) {
+          canvasUrls = scrapeEntries.filter(e => !e.excluded).map(e => e.url);
+        } else {
+          canvasUrls = extractAllUrls([what, who, why].join('\n'));
         }
-        content = buildCanvasContent(noteText, allUrls);
+        if (primaryUrl && !canvasUrls.includes(primaryUrl)) {
+          canvasUrls = [primaryUrl, ...canvasUrls];
+        }
+        content = buildCanvasContent(noteText, canvasUrls);
       } else {
         content = buildNoteContent({
           what,
           who,
           why,
           props: resolvedProps,
-          bodyText: (isBookmarklet || hasScraperConfig) ? extractedBodyText : '',
-          url: extractedUrl,
+          bodyText,
+          url: primaryUrl,
         });
       }
 
@@ -524,18 +660,6 @@ function escHtml(str: string): string {
 
 function safeDecodeUri(s: string): string {
   try { return decodeURIComponent(s); } catch { return s; }
-}
-
-function extractAllUrls(...texts: string[]): string[] {
-  const seen = new Set<string>();
-  const urls: string[] = [];
-  for (const text of texts) {
-    for (const m of text.matchAll(/https?:\/\/\S+/g)) {
-      const url = m[0].replace(/[.,;:!?)]+$/, ''); // strip trailing punctuation
-      if (!seen.has(url)) { seen.add(url); urls.push(url); }
-    }
-  }
-  return urls;
 }
 
 function generateHomeIcon(emoji: string, name: string): void {
