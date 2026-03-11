@@ -3,6 +3,10 @@ const CACHE = 'obsidian-capture-v1';
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  // Only cache same-origin requests; let cross-origin API calls pass through
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
   event.respondWith(
     (async function () {
       try {
