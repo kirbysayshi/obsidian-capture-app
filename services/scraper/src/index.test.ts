@@ -11,10 +11,12 @@ let mockPort: number;
 let mockStatusCode = 200;
 let mockBody = '<html><body>Hello</body></html>';
 let mockRedirectTarget = '';
+let lastRequestHeaders: http.IncomingHttpHeaders = {};
 
 function startMockServer(): Promise<void> {
   return new Promise((resolve) => {
-    mockServer = http.createServer((_req, res) => {
+    mockServer = http.createServer((req, res) => {
+      lastRequestHeaders = req.headers;
       if (mockRedirectTarget) {
         res.writeHead(301, { Location: mockRedirectTarget });
         res.end();
@@ -133,6 +135,36 @@ describe('Scraper service', () => {
       Authorization: 'Bearer test-secret',
     });
     assert.equal(resp.status, 502);
+  });
+
+  it('11. client User-Agent is forwarded to upstream', async () => {
+    mockStatusCode = 200;
+    mockBody = '<html><body>Test</body></html>';
+    mockRedirectTarget = '';
+
+    await scraperFetch(mockUrl(), {
+      Authorization: 'Bearer test-secret',
+      'User-Agent': 'TestBrowser/1.0 (custom)',
+    });
+
+    assert.equal(lastRequestHeaders['user-agent'], 'TestBrowser/1.0 (custom)');
+  });
+
+  it('12. client User-Agent is forwarded to Reddit JSON fetch', async () => {
+    mockStatusCode = 200;
+    mockBody = JSON.stringify([
+      { data: { children: [{ data: { title: 'T', selftext: 'B' } }] } },
+    ]);
+    mockRedirectTarget = '';
+
+    const result = await fetchRedditPost(
+      mockUrl(),
+      'https://www.reddit.com/r/test/comments/abc/',
+      'TestBrowser/2.0 (reddit)',
+    );
+
+    assert.equal(lastRequestHeaders['user-agent'], 'TestBrowser/2.0 (reddit)');
+    assert.ok(result.html.includes('<h1>T</h1>'));
   });
 
   it('8. isRedditPostUrl: matches /comments/ paths on reddit.com variants only', () => {

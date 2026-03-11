@@ -23,13 +23,16 @@ export function isRedditPostUrl(url: URL): boolean {
   );
 }
 
+const FALLBACK_UA = 'Mozilla/5.0 (compatible; ObsidianCaptureScraper/1.0)';
+
 export async function fetchRedditPost(
   jsonUrl: string,
   originalUrl: string,
+  userAgent = FALLBACK_UA,
 ): Promise<{ html: string; url: string }> {
   const resp = await fetch(jsonUrl, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; ObsidianCaptureScraper/1.0)',
+      'User-Agent': userAgent,
       Accept: 'application/json',
     },
     signal: AbortSignal.timeout(10_000),
@@ -82,12 +85,16 @@ app.get('/fetch', async (c) => {
     return c.json({ error: 'Only http/https URLs are supported' }, 400);
   }
 
+  const clientUa = c.req.header('User-Agent') ?? FALLBACK_UA;
+
   // Reddit: use JSON API to avoid bot detection
   if (isRedditPostUrl(targetUrl)) {
     const jsonUrl =
       targetUrl.origin + targetUrl.pathname.replace(/\/$/, '') + '.json';
     try {
-      return c.json(await fetchRedditPost(jsonUrl, targetUrl.toString()));
+      return c.json(
+        await fetchRedditPost(jsonUrl, targetUrl.toString(), clientUa),
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ error: `Fetch failed: ${msg}` }, 502);
@@ -98,7 +105,7 @@ app.get('/fetch', async (c) => {
   try {
     const resp = await fetch(targetUrl.toString(), {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; ObsidianCaptureScraper/1.0)',
+        'User-Agent': clientUa,
         'Accept-Language': 'en-US,en;q=0.9',
         Accept:
           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
