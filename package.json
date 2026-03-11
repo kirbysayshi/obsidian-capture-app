@@ -8,10 +8,16 @@
     "typecheck": "pnpm -r --parallel run typecheck",
     "format": "prettier --write .",
     "deploy:app": "pnpm --filter @obsidian-capture/app run deploy",
-    "deploy:scraper": "pnpm --filter @obsidian-capture/scraper run deploy"
+    "deploy:scraper": "pnpm --filter @obsidian-capture/scraper run deploy",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.3",
     "prettier": "latest"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
   },
   "packageManager": "pnpm@10.31.0",
   "volta": {
