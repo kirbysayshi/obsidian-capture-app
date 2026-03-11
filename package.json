@@ -6,8 +6,12 @@
     "build": "pnpm -r --parallel run build",
     "test": "pnpm -r --parallel run test",
     "typecheck": "pnpm -r --parallel run typecheck",
+    "format": "prettier --write .",
     "deploy:app": "pnpm --filter @obsidian-capture/app run deploy",
     "deploy:scraper": "pnpm --filter @obsidian-capture/scraper run deploy"
+  },
+  "devDependencies": {
+    "prettier": "latest"
   },
   "packageManager": "pnpm@10.31.0",
   "volta": {

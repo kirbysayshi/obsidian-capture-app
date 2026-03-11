@@ -30,15 +30,19 @@ function checkForUpdate(root: HTMLElement): void {
   async function check(): Promise<void> {
     if (root.querySelector('.update-banner')) return;
     try {
-      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-cache' });
+      const res = await fetch(`./version.json?t=${Date.now()}`, {
+        cache: 'no-cache',
+      });
       if (!res.ok) return;
-      const { version } = await res.json() as { version: string };
+      const { version } = (await res.json()) as { version: string };
       if (version === __APP_VERSION__) return;
 
       const banner = document.createElement('div');
       banner.className = 'update-banner';
       banner.innerHTML = `<span>A new version is available.</span><button class="btn-refresh">Refresh</button>`;
-      banner.querySelector('.btn-refresh')!.addEventListener('click', () => location.reload());
+      banner
+        .querySelector('.btn-refresh')!
+        .addEventListener('click', () => location.reload());
       root.prepend(banner);
     } catch {
       // Network unavailable — silently ignore

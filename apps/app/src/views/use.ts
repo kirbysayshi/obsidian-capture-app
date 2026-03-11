@@ -1,4 +1,8 @@
-import { decodeInstances, decodeScraperConfig, type Config } from '../lib/config.js';
+import {
+  decodeInstances,
+  decodeScraperConfig,
+  type Config,
+} from '../lib/config.js';
 import { scrapeUrl, extractAllUrls } from '../lib/scraper.js';
 import {
   buildObsidianUri,
@@ -8,7 +12,11 @@ import {
   makeReadableSlug,
   makeHumanTimestamp,
 } from '../lib/obsidian.js';
-import { extractContent, extractYouTubeContent, isYouTubeVideo } from '../lib/content.js';
+import {
+  extractContent,
+  extractYouTubeContent,
+  isYouTubeVideo,
+} from '../lib/content.js';
 
 type ScrapeStatus = 'pending' | 'loading' | 'done' | 'error';
 interface ScrapeEntry {
@@ -49,7 +57,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     <div class="use-view">
       <div id="instancePicker" class="instance-picker" style="${instances.length === 1 ? 'display:none' : ''}">
         <h2>Where do you want to save?</h2>
-        ${instances.map((inst, i) => `
+        ${instances
+          .map(
+            (inst, i) => `
           <button class="instance-option" data-index="${i}">
             <span class="instance-option-icon">${escHtml(inst.emoji || '📎')}</span>
             <span class="instance-option-text">
@@ -57,7 +67,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
               <span class="instance-option-sub">${escHtml(inst.vault)}${inst.folder ? ' / ' + inst.folder : ''}</span>
             </span>
           </button>
-        `).join('')}
+        `,
+          )
+          .join('')}
         <div class="picker-footer">
           <a class="configure-link" id="pickerConfigureLink" href="#">Edit configuration</a>
           <button class="btn-cancel secondary" id="btnPickerCancel">Cancel</button>
@@ -119,16 +131,20 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     configureParams.set('mode', 'configure');
     const configureHref = `${window.location.pathname}?${configureParams}`;
 
-    const pickerConfigureLink = root.querySelector<HTMLAnchorElement>('#pickerConfigureLink')!;
+    const pickerConfigureLink = root.querySelector<HTMLAnchorElement>(
+      '#pickerConfigureLink',
+    )!;
     pickerConfigureLink.href = configureHref;
 
-    root.querySelector<HTMLButtonElement>('#btnPickerCancel')!.addEventListener('click', () => {
-      if (isBookmarklet) {
-        window.parent.postMessage({ type: 'close' }, '*');
-      } else {
-        window.history.back();
-      }
-    });
+    root
+      .querySelector<HTMLButtonElement>('#btnPickerCancel')!
+      .addEventListener('click', () => {
+        if (isBookmarklet) {
+          window.parent.postMessage({ type: 'close' }, '*');
+        } else {
+          window.history.back();
+        }
+      });
   }
 
   // ── Scrape entry state ─────────────────────────────────────────────────────
@@ -140,21 +156,23 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   if (instances.length === 1) {
     showForm(firstInstance);
   } else {
-    instancePicker.querySelectorAll<HTMLButtonElement>('.instance-option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.index ?? '0', 10);
-        activeConfig = instances[idx];
-        applyPageMeta(activeConfig);
-        instancePicker.style.display = 'none';
-        captureForm.style.display = '';
-        showForm(activeConfig);
+    instancePicker
+      .querySelectorAll<HTMLButtonElement>('.instance-option')
+      .forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.index ?? '0', 10);
+          activeConfig = instances[idx];
+          applyPageMeta(activeConfig);
+          instancePicker.style.display = 'none';
+          captureForm.style.display = '';
+          showForm(activeConfig);
+        });
       });
-    });
   }
 
   function reconcileScrapeEntries(urls: string[]): void {
-    const existingMap = new Map(scrapeEntries.map(e => [e.url, e]));
-    scrapeEntries = urls.map(url => {
+    const existingMap = new Map(scrapeEntries.map((e) => [e.url, e]));
+    scrapeEntries = urls.map((url) => {
       if (existingMap.has(url)) return existingMap.get(url)!;
       return {
         id: `entry-${Math.random().toString(36).slice(2)}`,
@@ -173,7 +191,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     entry.status = 'loading';
     renderScrapeList();
     try {
-      const result = await scrapeUrl(scraperConfig.serviceUrl, scraperConfig.secret, entry.url);
+      const result = await scrapeUrl(
+        scraperConfig.serviceUrl,
+        scraperConfig.secret,
+        entry.url,
+      );
       const diag: string[] = [];
       if (isYouTubeVideo(result.url) || isYouTubeVideo(entry.url)) {
         const yt = extractYouTubeContent(result.html, diag);
@@ -183,7 +205,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           parts.push(`# ${yt.title}`);
           const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
           if (channelLine) parts.push(`**Channel:** ${channelLine}`);
-          if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
+          if (yt.description)
+            parts.push(`**Description:**\n\n${yt.description}`);
           entry.bodyText = parts.join('\n\n');
         } else {
           entry.bodyText = '⚠️ Could not extract YouTube metadata.';
@@ -195,7 +218,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           const meta: string[] = [];
           if (article.byline) meta.push(`By: ${article.byline}`);
           if (article.siteName) meta.push(`Site: ${article.siteName}`);
-          if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
+          if (article.publishedTime)
+            meta.push(`Published: ${article.publishedTime}`);
           const parts: string[] = [];
           parts.push(`# ${entry.title}`);
           if (meta.length) parts.push(meta.join(' · '));
@@ -222,51 +246,65 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       return;
     }
 
-    list.innerHTML = scrapeEntries.map(entry => {
-      const urlDisplay = escHtml(entry.url.replace(/^https?:\/\//, '').slice(0, 80));
+    list.innerHTML = scrapeEntries
+      .map((entry) => {
+        const urlDisplay = escHtml(
+          entry.url.replace(/^https?:\/\//, '').slice(0, 80),
+        );
 
-      let statusIcon = '';
-      let statusClass = '';
-      if (entry.status === 'pending') {
-        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--pending">○</span>`;
-        statusClass = 'scrape-entry--pending';
-      } else if (entry.status === 'loading') {
-        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--loading"></span>`;
-        statusClass = 'scrape-entry--loading';
-      } else if (entry.status === 'done') {
-        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--done">✓</span>`;
-        statusClass = 'scrape-entry--done';
-      } else {
-        statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--error">⚠</span>`;
-        statusClass = 'scrape-entry--error';
-      }
+        let statusIcon = '';
+        let statusClass = '';
+        if (entry.status === 'pending') {
+          statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--pending">○</span>`;
+          statusClass = 'scrape-entry--pending';
+        } else if (entry.status === 'loading') {
+          statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--loading"></span>`;
+          statusClass = 'scrape-entry--loading';
+        } else if (entry.status === 'done') {
+          statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--done">✓</span>`;
+          statusClass = 'scrape-entry--done';
+        } else {
+          statusIcon = `<span class="scrape-entry-status-icon scrape-entry-status--error">⚠</span>`;
+          statusClass = 'scrape-entry--error';
+        }
 
-      const excludeBtn = entry.excluded
-        ? `<button class="btn-exclude-entry" data-action="include" data-id="${entry.id}" title="Re-include">↩</button>`
-        : `<button class="btn-exclude-entry" data-action="exclude" data-id="${entry.id}" title="Exclude">✕</button>`;
+        const excludeBtn = entry.excluded
+          ? `<button class="btn-exclude-entry" data-action="include" data-id="${entry.id}" title="Re-include">↩</button>`
+          : `<button class="btn-exclude-entry" data-action="exclude" data-id="${entry.id}" title="Exclude">✕</button>`;
 
-      const fetchBtn = entry.status === 'pending'
-        ? `<button class="btn-scrape-entry" data-id="${entry.id}" type="button">Fetch</button>`
-        : entry.status === 'error'
-          ? `<button class="btn-retry-entry" data-id="${entry.id}" type="button">Retry</button>`
-          : '';
+        const fetchBtn =
+          entry.status === 'pending'
+            ? `<button class="btn-scrape-entry" data-id="${entry.id}" type="button">Fetch</button>`
+            : entry.status === 'error'
+              ? `<button class="btn-retry-entry" data-id="${entry.id}" type="button">Retry</button>`
+              : '';
 
-      const preview = entry.status === 'done' && !entry.excluded && entry.bodyText
-        ? `<details class="scrape-entry-preview">
+        const preview =
+          entry.status === 'done' && !entry.excluded && entry.bodyText
+            ? `<details class="scrape-entry-preview">
             <summary>Clipped content</summary>
             <pre>${escHtml(entry.bodyText.slice(0, 500))}${entry.bodyText.length > 500 ? '…' : ''}</pre>
           </details>`
-        : '';
+            : '';
 
-      const errorMsg = entry.status === 'error'
-        ? `<div class="scrape-entry-error">${escHtml(entry.errorMsg)}</div>`
-        : '';
+        const errorMsg =
+          entry.status === 'error'
+            ? `<div class="scrape-entry-error">${escHtml(entry.errorMsg)}</div>`
+            : '';
 
-      const entryClass = ['scrape-entry', statusClass, entry.excluded ? 'scrape-entry--excluded' : ''].filter(Boolean).join(' ');
-      const isClickable = entry.status === 'pending' && !entry.excluded;
-      const headerClass = isClickable ? 'scrape-entry-header scrape-entry-header--clickable' : 'scrape-entry-header';
+        const entryClass = [
+          'scrape-entry',
+          statusClass,
+          entry.excluded ? 'scrape-entry--excluded' : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const isClickable = entry.status === 'pending' && !entry.excluded;
+        const headerClass = isClickable
+          ? 'scrape-entry-header scrape-entry-header--clickable'
+          : 'scrape-entry-header';
 
-      return `<div class="${entryClass}" data-id="${entry.id}">
+        return `<div class="${entryClass}" data-id="${entry.id}">
         <div class="${headerClass}" data-fetch="${isClickable ? entry.id : ''}">
           ${statusIcon}
           <span class="scrape-entry-url" title="${escHtml(entry.url)}">${urlDisplay}</span>
@@ -276,33 +314,44 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         ${errorMsg}
         ${preview}
       </div>`;
-    }).join('');
+      })
+      .join('');
 
-    list.querySelectorAll<HTMLButtonElement>('.btn-scrape-entry, .btn-retry-entry').forEach(btn => {
-      btn.addEventListener('click', ev => {
-        ev.stopPropagation();
-        const entry = scrapeEntries.find(e => e.id === btn.dataset.id);
-        if (entry && entry.status !== 'loading') void doScrapeEntry(entry);
+    list
+      .querySelectorAll<HTMLButtonElement>(
+        '.btn-scrape-entry, .btn-retry-entry',
+      )
+      .forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const entry = scrapeEntries.find((e) => e.id === btn.dataset.id);
+          if (entry && entry.status !== 'loading') void doScrapeEntry(entry);
+        });
       });
-    });
 
-    list.querySelectorAll<HTMLButtonElement>('.btn-exclude-entry').forEach(btn => {
-      btn.addEventListener('click', ev => {
-        ev.stopPropagation();
-        const entry = scrapeEntries.find(e => e.id === btn.dataset.id);
-        if (entry) {
-          entry.excluded = btn.dataset.action === 'exclude';
-          renderScrapeList();
-        }
+    list
+      .querySelectorAll<HTMLButtonElement>('.btn-exclude-entry')
+      .forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const entry = scrapeEntries.find((e) => e.id === btn.dataset.id);
+          if (entry) {
+            entry.excluded = btn.dataset.action === 'exclude';
+            renderScrapeList();
+          }
+        });
       });
-    });
 
-    list.querySelectorAll<HTMLElement>('.scrape-entry-header--clickable').forEach(header => {
-      header.addEventListener('click', () => {
-        const entry = scrapeEntries.find(e => e.id === header.dataset.fetch);
-        if (entry && entry.status === 'pending') void doScrapeEntry(entry);
+    list
+      .querySelectorAll<HTMLElement>('.scrape-entry-header--clickable')
+      .forEach((header) => {
+        header.addEventListener('click', () => {
+          const entry = scrapeEntries.find(
+            (e) => e.id === header.dataset.fetch,
+          );
+          if (entry && entry.status === 'pending') void doScrapeEntry(entry);
+        });
       });
-    });
   }
 
   // ── showForm: wire up form for a selected config ───────────────────────────
@@ -314,13 +363,17 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     fieldWhen.value = toDatetimeLocal(new Date());
     const btnSave = root.querySelector<HTMLButtonElement>('#btnSave')!;
     const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
-    const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink');
-    const boolPropsSection = root.querySelector<HTMLElement>('#boolPropsSection')!;
+    const configureLink =
+      root.querySelector<HTMLAnchorElement>('#configureLink');
+    const boolPropsSection =
+      root.querySelector<HTMLElement>('#boolPropsSection')!;
     const vaultInfo = root.querySelector<HTMLElement>('#vaultInfo')!;
     const canvasBadge = root.querySelector<HTMLElement>('#canvasBadge')!;
     const captureTitle = root.querySelector<HTMLElement>('#captureTitle')!;
 
-    const titleText = config.emoji ? `${config.emoji} ${config.name || 'Capture'}` : (config.name || 'Capture');
+    const titleText = config.emoji
+      ? `${config.emoji} ${config.name || 'Capture'}`
+      : config.name || 'Capture';
     captureTitle.textContent = titleText;
     vaultInfo.innerHTML = `→ ${escHtml(config.vault)}${config.folder ? `<br><span class="vault-folder">${escHtml(config.folder)}</span>` : ''}`;
     canvasBadge.style.display = config.canvas ? '' : 'none';
@@ -333,7 +386,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     }
 
     boolPropsSection.innerHTML = '';
-    const booleanProps = config.props.filter(p => p.type === 'boolean');
+    const booleanProps = config.props.filter((p) => p.type === 'boolean');
     for (const prop of booleanProps) {
       const field = document.createElement('div');
       field.className = 'field';
@@ -354,7 +407,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       scrapeEntries = [];
       renderScrapeList();
       for (const prop of booleanProps) {
-        const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
+        const cb = boolPropsSection.querySelector<HTMLInputElement>(
+          `[data-key="${escProp(prop.k)}"]`,
+        );
         if (cb) cb.checked = prop.v === 'true';
       }
     }
@@ -379,7 +434,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         reconcileScrapeEntries(urls);
         if (scrapeTimer) clearTimeout(scrapeTimer);
         if (urls.length === 1 && scrapeEntries[0]?.status === 'pending') {
-          scrapeTimer = setTimeout(() => void doScrapeEntry(scrapeEntries[0]), 600);
+          scrapeTimer = setTimeout(
+            () => void doScrapeEntry(scrapeEntries[0]),
+            600,
+          );
         }
       });
     }
@@ -390,7 +448,10 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       if (url) {
         fieldWhat.value = url;
         reconcileScrapeEntries([url]);
-        scrapeTimer = setTimeout(() => void doScrapeEntry(scrapeEntries[0]), 600);
+        scrapeTimer = setTimeout(
+          () => void doScrapeEntry(scrapeEntries[0]),
+          600,
+        );
       }
     }
 
@@ -406,15 +467,20 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       let primaryUrl: string;
 
       if (hasScraperConfig) {
-        const doneEntries = scrapeEntries.filter(e => e.status === 'done' && !e.excluded);
+        const doneEntries = scrapeEntries.filter(
+          (e) => e.status === 'done' && !e.excluded,
+        );
         const firstTitle = doneEntries[0]?.title || '';
         slugSource = firstTitle || (what.split('\n')[0] ?? 'capture');
 
-        let aggregatedBody = doneEntries.map(e => e.bodyText).filter(Boolean).join('\n\n---\n\n');
+        let aggregatedBody = doneEntries
+          .map((e) => e.bodyText)
+          .filter(Boolean)
+          .join('\n\n---\n\n');
         if (doneEntries.length === 1) {
           primaryUrl = doneEntries[0].url;
         } else if (doneEntries.length > 1) {
-          const sources = doneEntries.map(e => `- ${e.url}`).join('\n');
+          const sources = doneEntries.map((e) => `- ${e.url}`).join('\n');
           if (aggregatedBody) aggregatedBody += '\n\n';
           aggregatedBody += `Sources:\n${sources}`;
           primaryUrl = '';
@@ -437,9 +503,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         filename = `${ts} ${slug}.md`;
       }
 
-      const resolvedProps = config.props.map(prop => {
+      const resolvedProps = config.props.map((prop) => {
         if (prop.type !== 'boolean') return prop;
-        const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
+        const cb = boolPropsSection.querySelector<HTMLInputElement>(
+          `[data-key="${escProp(prop.k)}"]`,
+        );
         return { ...prop, v: cb?.checked ? 'true' : 'false' };
       });
 
@@ -455,7 +523,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         });
         let canvasUrls: string[];
         if (hasScraperConfig && scrapeEntries.length > 0) {
-          canvasUrls = scrapeEntries.filter(e => !e.excluded).map(e => e.url);
+          canvasUrls = scrapeEntries
+            .filter((e) => !e.excluded)
+            .map((e) => e.url);
         } else {
           canvasUrls = extractAllUrls([what, who, why].join('\n'));
         }
@@ -499,7 +569,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 function applyPageMeta(config: Config): void {
   if (config.name) {
     document.title = config.name;
-    let metaTitle = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    let metaTitle = document.querySelector<HTMLMetaElement>(
+      'meta[name="apple-mobile-web-app-title"]',
+    );
     if (!metaTitle) {
       metaTitle = document.createElement('meta');
       metaTitle.name = 'apple-mobile-web-app-title';
@@ -512,8 +584,10 @@ function applyPageMeta(config: Config): void {
 
 /** Detect iOS/PWA standalone mode (launched from home screen). */
 function isStandalone(): boolean {
-  return (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches;
+  return (
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches
+  );
 }
 
 function escProp(str: string): string {
@@ -525,7 +599,11 @@ function escHtml(str: string): string {
 }
 
 function safeDecodeUri(s: string): string {
-  try { return decodeURIComponent(s); } catch { return s; }
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
 }
 
 function generateHomeIcon(emoji: string, name: string): void {
@@ -547,7 +625,9 @@ function generateHomeIcon(emoji: string, name: string): void {
   ctx.font = emoji ? '110px sans-serif' : 'bold 96px sans-serif';
   ctx.fillText(char, size / 2, size / 2);
 
-  let link = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+  let link = document.querySelector<HTMLLinkElement>(
+    'link[rel="apple-touch-icon"]',
+  );
   if (!link) {
     link = document.createElement('link');
     link.rel = 'apple-touch-icon';

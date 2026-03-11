@@ -17,10 +17,10 @@ import { VAULT, FOLDER, CAPTURE_BASE, FIXTURES } from './helpers.js';
  * Returns fixture HTML for known fixture URLs; 404 JSON for everything else.
  */
 function mockScraper(page: Page): Promise<void> {
-  return page.route('http://localhost:8080/fetch**', async route => {
+  return page.route('http://localhost:8080/fetch**', async (route) => {
     const reqUrl = new URL(route.request().url());
     const targetUrl = decodeURIComponent(reqUrl.searchParams.get('url') ?? '');
-    const fixture = FIXTURES.find(f => f.url === targetUrl);
+    const fixture = FIXTURES.find((f) => f.url === targetUrl);
     if (fixture) {
       await route.fulfill({
         contentType: 'application/json',
@@ -45,17 +45,23 @@ test.describe('Scraper auto-fetch flow', () => {
       await page.goto(CAPTURE_BASE);
 
       // Listen for obsidianUri postMessage before triggering scrape
-      const uriPromise = page.evaluate(() =>
-        new Promise<string>(resolve => window.addEventListener('message', (e: MessageEvent) => {
-          if ((e.data as { type?: string })?.type === 'obsidianUri') resolve((e.data as { url: string }).url);
-        }))
+      const uriPromise = page.evaluate(
+        () =>
+          new Promise<string>((resolve) =>
+            window.addEventListener('message', (e: MessageEvent) => {
+              if ((e.data as { type?: string })?.type === 'obsidianUri')
+                resolve((e.data as { url: string }).url);
+            }),
+          ),
       );
 
       // Paste canonical fixture URL into What field — triggers auto-scrape after 600ms
       await page.fill('#fieldWhat', fixture.url);
 
       // Wait for content extraction to complete (entry transitions to done)
-      await expect(page.locator('.scrape-entry--done')).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('.scrape-entry--done')).toBeVisible({
+        timeout: 15_000,
+      });
 
       // Click Save
       await page.locator('#btnSave').click();
@@ -95,10 +101,15 @@ test.describe('Multi-URL scrape list', () => {
     await page.fill('#fieldWhat', `${url1}\n${url2}`);
 
     // Click the first pending entry header
-    await page.locator('.scrape-entry--pending .scrape-entry-header--clickable').first().click();
+    await page
+      .locator('.scrape-entry--pending .scrape-entry-header--clickable')
+      .first()
+      .click();
 
     // First entry transitions to done
-    await expect(page.locator('.scrape-entry--done')).toHaveCount(1, { timeout: 15_000 });
+    await expect(page.locator('.scrape-entry--done')).toHaveCount(1, {
+      timeout: 15_000,
+    });
     // Second entry remains pending
     await expect(page.locator('.scrape-entry--pending')).toHaveCount(1);
   });
@@ -110,14 +121,18 @@ test.describe('Multi-URL scrape list', () => {
     await page.fill('#fieldWhat', FIXTURES[0].url);
 
     // Wait for auto-scrape to finish
-    await expect(page.locator('.scrape-entry--done')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.scrape-entry--done')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Click exclude
     await page.locator('.btn-exclude-entry').click();
     await expect(page.locator('.scrape-entry--excluded')).toBeVisible();
 
     // Undo button appears (↩)
-    await expect(page.locator('.btn-exclude-entry[data-action="include"]')).toBeVisible();
+    await expect(
+      page.locator('.btn-exclude-entry[data-action="include"]'),
+    ).toBeVisible();
   });
 
   test('error state shows retry button', async ({ page }) => {
@@ -128,7 +143,9 @@ test.describe('Multi-URL scrape list', () => {
     await page.fill('#fieldWhat', 'https://example.com/not-found');
 
     // Auto-scrape fires, gets 404, transitions to error
-    await expect(page.locator('.scrape-entry--error')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.scrape-entry--error')).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.locator('.btn-retry-entry')).toBeVisible();
   });
 });

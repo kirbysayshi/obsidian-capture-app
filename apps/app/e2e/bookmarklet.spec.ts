@@ -27,7 +27,7 @@ test.describe('Bookmarklet capture flow', () => {
     test(`bookmarklet: ${fixture.name}`, async ({ page }) => {
       // Serve minimal HTML to the browser for the fixture URL so page scripts
       // don't run or redirect — preserves location.href for the bookmarklet.
-      await page.route(fixture.url, route =>
+      await page.route(fixture.url, (route) =>
         route.fulfill({
           contentType: 'text/html; charset=utf-8',
           body: `<!DOCTYPE html><html><head><title>${fixture.name}</title></head><body></body></html>`,
@@ -36,7 +36,7 @@ test.describe('Bookmarklet capture flow', () => {
 
       // Mock the scraper endpoint: return fixture HTML with the canonical URL
       // so isYouTubeVideo() fires correctly in doScrapeEntry.
-      await page.route('http://localhost:8080/fetch**', async route => {
+      await page.route('http://localhost:8080/fetch**', async (route) => {
         await route.fulfill({
           contentType: 'application/json',
           body: JSON.stringify({ url: fixture.url, html: fixture.html }),
@@ -58,13 +58,15 @@ test.describe('Bookmarklet capture flow', () => {
       // Register the frame listener BEFORE evaluating the bookmarklet to avoid
       // missing the framenavigated event if the iframe loads quickly.
       const frameNavPromise = page.waitForEvent('framenavigated', {
-        predicate: frame => frame.url().includes('mode=bm'),
+        predicate: (frame) => frame.url().includes('mode=bm'),
         timeout: 10000,
       });
 
       // Run the real generated bookmarklet — proves the actual deployed code works
       const bookmarkletUrl = generateBookmarklet(CAPTURE_BASE as string);
-      const code = decodeURIComponent(bookmarkletUrl.slice('javascript:'.length));
+      const code = decodeURIComponent(
+        bookmarkletUrl.slice('javascript:'.length),
+      );
       await page.evaluate(code);
 
       const captureFrame = await frameNavPromise;
@@ -77,16 +79,22 @@ test.describe('Bookmarklet capture flow', () => {
       const frameLocator = page.frameLocator('iframe[src*="mode=bm"]');
 
       // Wait for scraper to finish fetching and parsing
-      await frameLocator.locator('.scrape-entry--done').waitFor({ timeout: 15000 });
+      await frameLocator
+        .locator('.scrape-entry--done')
+        .waitFor({ timeout: 15000 });
 
       // Click Save
       await frameLocator.locator('#btnSave').click();
 
       // Capture the obsidian URI posted to the parent frame
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await page.waitForFunction(() => !!(window as any).__obsidianUrl, { timeout: 5000 });
+      await page.waitForFunction(() => !!(window as any).__obsidianUrl, {
+        timeout: 5000,
+      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const obsidianUrl = await page.evaluate(() => (window as any).__obsidianUrl as string);
+      const obsidianUrl = await page.evaluate(
+        () => (window as any).__obsidianUrl as string,
+      );
 
       // Parse the obsidian://new?vault=...&file=...&content=... URI
       const qs = obsidianUrl.slice(obsidianUrl.indexOf('?') + 1);

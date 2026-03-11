@@ -18,14 +18,14 @@ export interface Config {
 function utf8ToBase64(str: string): string {
   return btoa(
     Array.from(new TextEncoder().encode(str))
-      .map(b => String.fromCharCode(b))
-      .join('')
+      .map((b) => String.fromCharCode(b))
+      .join(''),
   );
 }
 
 function base64ToUtf8(b64: string): string {
   return new TextDecoder().decode(
-    Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)),
   );
 }
 
@@ -56,7 +56,7 @@ interface EncodedInstance {
 
 export function encodeInstances(configs: Config[]): URLSearchParams {
   const params = new URLSearchParams();
-  const data: EncodedInstance[] = configs.map(cfg => {
+  const data: EncodedInstance[] = configs.map((cfg) => {
     const entry: EncodedInstance = { vault: cfg.vault };
     if (cfg.folder) entry.folder = cfg.folder;
     if (cfg.name) entry.name = cfg.name;
@@ -74,7 +74,7 @@ export function decodeInstances(params: URLSearchParams): Config[] | null {
   if (!raw) return null;
   try {
     const data = JSON.parse(base64ToUtf8(raw)) as EncodedInstance[];
-    return data.map(entry => ({
+    return data.map((entry) => ({
       vault: entry.vault ?? '',
       folder: entry.folder ?? '',
       name: entry.name ?? '',
@@ -89,7 +89,10 @@ export function decodeInstances(params: URLSearchParams): Config[] | null {
 
 /** Decode global scraper config from URL params (su + ss).
  *  Falls back to build-time env default for the URL. */
-export function decodeScraperConfig(params: URLSearchParams): { serviceUrl: string; secret: string } {
+export function decodeScraperConfig(params: URLSearchParams): {
+  serviceUrl: string;
+  secret: string;
+} {
   return {
     serviceUrl: params.get('su') ?? import.meta.env.VITE_SCRAPER_URL ?? '',
     secret: params.get('ss') ?? import.meta.env.VITE_SCRAPER_SECRET ?? '',

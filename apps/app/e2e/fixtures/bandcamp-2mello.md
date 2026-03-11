@@ -3,7 +3,7 @@ name: rhythm pools 01 - naissance | 2 Mello
 url: https://2mellomakes.bandcamp.com/album/rhythm-pools-01-naissance
 expectContains:
   - 'what: "https://2mellomakes.bandcamp.com/album/rhythm-pools-01-naissance"'
-  - "# rhythm pools 01 - naissance, by 2 Mello"
+  - '# rhythm pools 01 - naissance, by 2 Mello'
   - 10 tracks
   - These are special ideas formerly without a home that I really needed
 ---
@@ -913,9 +913,6 @@ per-release basis, and a whole lot more. <a href="https://bandcamp.com/labels">l
 
 <section id="tracklist" class="tracklist-container desktop-left">
     <ol class="tracks">
-    
-        
-
 
         <li id="track_" class="track  has-audio" tabindex="0" data-num="1" data-bind="css: { playing: isPlaying(), active: isActive() }" aria-label="track 1 already found joy">
             <span class="track-num"><span>1.</span></span>

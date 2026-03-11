@@ -20,7 +20,12 @@ export interface NoteContentParams {
 /**
  * Build an obsidian://new URI.
  */
-export function buildObsidianUri({ vault, folder, filename, content }: ObsidianUriParams): string {
+export function buildObsidianUri({
+  vault,
+  folder,
+  filename,
+  content,
+}: ObsidianUriParams): string {
   const file = folder ? `${folder}/${filename}` : filename;
   // Use encodeURIComponent — URLSearchParams encodes spaces as '+' which Obsidian misreads
   return `obsidian://new?vault=${encodeURIComponent(vault)}&file=${encodeURIComponent(file)}&content=${encodeURIComponent(content)}`;
@@ -47,10 +52,14 @@ export function makeReadableSlug(title: string): string {
 export function makeHumanTimestamp(date: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return (
-    String(date.getFullYear()) + '-' +
-    pad(date.getMonth() + 1) + '-' +
-    pad(date.getDate()) + ' ' +
-    pad(date.getHours()) + '.' +
+    String(date.getFullYear()) +
+    '-' +
+    pad(date.getMonth() + 1) +
+    '-' +
+    pad(date.getDate()) +
+    ' ' +
+    pad(date.getHours()) +
+    '.' +
     pad(date.getMinutes())
   );
 }
@@ -110,8 +119,8 @@ export function buildCanvasNoteText({
   const lines: string[] = [];
   lines.push(`**Created:** ${makeHumanTimestamp(date)}`);
   if (what) lines.push(`**What:** ${what}`);
-  if (who)  lines.push(`**Who:** ${who}`);
-  if (why)  lines.push(`**Why:** ${why}`);
+  if (who) lines.push(`**Who:** ${who}`);
+  if (why) lines.push(`**Why:** ${why}`);
   if (bodyText) {
     lines.push('');
     lines.push(bodyText.trim());
@@ -129,15 +138,31 @@ export function buildCanvasNoteText({
  * - Each URL becomes a link node arranged in a golden-angle spiral outward from the note
  * - Edges connect each link node back to the note
  */
-export function buildCanvasContent(noteText: string, urls: string[] = []): string {
-  const NOTE_W = 460, NOTE_H = 360, LINK_W = 400, LINK_H = 300, GAP = 60;
-  const NOTE_CX = NOTE_W / 2, NOTE_CY = NOTE_H / 2;
+export function buildCanvasContent(
+  noteText: string,
+  urls: string[] = [],
+): string {
+  const NOTE_W = 460,
+    NOTE_H = 360,
+    LINK_W = 400,
+    LINK_H = 300,
+    GAP = 60;
+  const NOTE_CX = NOTE_W / 2,
+    NOTE_CY = NOTE_H / 2;
 
   const nodes: object[] = [];
   const edges: object[] = [];
 
   if (noteText) {
-    nodes.push({ id: 'note', type: 'text', text: noteText, x: 0, y: 0, width: NOTE_W, height: NOTE_H });
+    nodes.push({
+      id: 'note',
+      type: 'text',
+      text: noteText,
+      x: 0,
+      y: 0,
+      width: NOTE_W,
+      height: NOTE_H,
+    });
   }
 
   // Golden angle spiral: successive nodes spread evenly without clustering
@@ -149,12 +174,22 @@ export function buildCanvasContent(noteText: string, urls: string[] = []): strin
     const radius = baseRadius + i * (LINK_W * 0.4 + GAP);
     const lx = Math.round(NOTE_CX + radius * Math.cos(angle) - LINK_W / 2);
     const ly = Math.round(NOTE_CY + radius * Math.sin(angle) - LINK_H / 2);
-    nodes.push({ id: `l${i}`, type: 'link', url, x: lx, y: ly, width: LINK_W, height: LINK_H });
+    nodes.push({
+      id: `l${i}`,
+      type: 'link',
+      url,
+      x: lx,
+      y: ly,
+      width: LINK_W,
+      height: LINK_H,
+    });
     if (noteText) {
       edges.push({
         id: `e${i}`,
-        fromNode: 'note', fromSide: angleToSide(angle),
-        toNode: `l${i}`, toSide: angleToSide(angle + Math.PI),
+        fromNode: 'note',
+        fromSide: angleToSide(angle),
+        toNode: `l${i}`,
+        toSide: angleToSide(angle + Math.PI),
       });
     }
   });
@@ -165,9 +200,9 @@ export function buildCanvasContent(noteText: string, urls: string[] = []): strin
 function angleToSide(angle: number): 'top' | 'bottom' | 'left' | 'right' {
   const TWO_PI = Math.PI * 2;
   const a = ((angle % TWO_PI) + TWO_PI) % TWO_PI;
-  if (a < Math.PI / 4 || a >= 7 * Math.PI / 4) return 'right';
-  if (a < 3 * Math.PI / 4) return 'bottom';
-  if (a < 5 * Math.PI / 4) return 'left';
+  if (a < Math.PI / 4 || a >= (7 * Math.PI) / 4) return 'right';
+  if (a < (3 * Math.PI) / 4) return 'bottom';
+  if (a < (5 * Math.PI) / 4) return 'left';
   return 'top';
 }
 

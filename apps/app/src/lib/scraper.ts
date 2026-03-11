@@ -1,12 +1,22 @@
-export interface ScrapeResult { html: string; url: string; }
+export interface ScrapeResult {
+  html: string;
+  url: string;
+}
 
-export async function scrapeUrl(serviceUrl: string, secret: string, targetUrl: string): Promise<ScrapeResult> {
+export async function scrapeUrl(
+  serviceUrl: string,
+  secret: string,
+  targetUrl: string,
+): Promise<ScrapeResult> {
   const endpoint = `${serviceUrl.replace(/\/$/, '')}/fetch?url=${encodeURIComponent(targetUrl)}`;
   const headers: Record<string, string> = {};
   if (secret) headers['Authorization'] = `Bearer ${secret}`;
-  const resp = await fetch(endpoint, { headers, signal: AbortSignal.timeout(15_000) });
+  const resp = await fetch(endpoint, {
+    headers,
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!resp.ok) {
-    const body = await resp.json().catch(() => ({})) as { error?: string };
+    const body = (await resp.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `HTTP ${resp.status}`);
   }
   return resp.json() as Promise<ScrapeResult>;
@@ -24,7 +34,10 @@ export function extractAllUrls(text: string): string[] {
   const urls: string[] = [];
   for (const m of text.matchAll(/https?:\/\/\S+/g)) {
     const url = m[0].replace(/[.,;:!?)]+$/, '');
-    if (!seen.has(url)) { seen.add(url); urls.push(url); }
+    if (!seen.has(url)) {
+      seen.add(url);
+      urls.push(url);
+    }
   }
   return urls;
 }

@@ -43,7 +43,10 @@ export function isYouTubeVideo(url: string): boolean {
  *
  * Pass a `diag` array to collect diagnostic log lines.
  */
-export function extractYouTubeContent(html: string, diag?: string[]): YouTubeContent | null {
+export function extractYouTubeContent(
+  html: string,
+  diag?: string[],
+): YouTubeContent | null {
   try {
     diag?.push(`html.length = ${html.length}`);
     const ytData = parseYtInitialData(html, diag);
@@ -58,7 +61,10 @@ export function extractYouTubeContent(html: string, diag?: string[]): YouTubeCon
 /**
  * Extract article content from an HTML string using Readability.
  */
-export function extractContent(html: string, url: string): ArticleContent | null {
+export function extractContent(
+  html: string,
+  url: string,
+): ArticleContent | null {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -96,7 +102,10 @@ export function extractContent(html: string, url: string): ArticleContent | null
  * sequences natively. The result may be a parsed object (desktop) or a JSON
  * string (mobile), so we JSON.parse string results.
  */
-function parseYtInitialData(html: string, diag?: string[]): Record<string, unknown> | null {
+function parseYtInitialData(
+  html: string,
+  diag?: string[],
+): Record<string, unknown> | null {
   const MARKER = 'var ytInitialData = ';
   const markerIdx = html.indexOf(MARKER);
   diag?.push(`marker idx: ${markerIdx}`);
@@ -133,20 +142,41 @@ function parseYtInitialData(html: string, diag?: string[]): Record<string, unkno
  *
  * Desktop uses twoColumnWatchNextResults; mobile uses singleColumnWatchNextResults.
  */
-function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouTubeContent | null {
+function extractFromYtData(
+  data: Record<string, unknown>,
+  diag?: string[],
+): YouTubeContent | null {
   // Desktop layout
   const desktopContents = asArr(
-    dig(data, 'contents', 'twoColumnWatchNextResults', 'results', 'results', 'contents'),
+    dig(
+      data,
+      'contents',
+      'twoColumnWatchNextResults',
+      'results',
+      'results',
+      'contents',
+    ),
   );
 
   // Mobile layout: singleColumnWatchNextResults → results → contents → slimVideoMetadataRenderer, etc.
   // The video info is nested inside slimVideoMetadataRenderer and slimOwnerRenderer.
   const mobileItems = asArr(
-    dig(data, 'contents', 'singleColumnWatchNextResults', 'results', 'results', 'contents'),
+    dig(
+      data,
+      'contents',
+      'singleColumnWatchNextResults',
+      'results',
+      'results',
+      'contents',
+    ),
   );
 
-  diag?.push(`desktop contents: ${desktopContents.length}, mobile items: ${mobileItems.length}`);
-  diag?.push(`top-level contents keys: ${Object.keys((data.contents ?? {}) as object).join(', ')}`);
+  diag?.push(
+    `desktop contents: ${desktopContents.length}, mobile items: ${mobileItems.length}`,
+  );
+  diag?.push(
+    `top-level contents keys: ${Object.keys((data.contents ?? {}) as object).join(', ')}`,
+  );
 
   let title = '';
   let channel = '';
@@ -186,15 +216,18 @@ function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouT
   //     expandableVideoDescriptionBodyRenderer.attributedDescriptionBodyText.content
   if (!title && !description) {
     for (const item of mobileItems) {
-      for (const sub of asArr(dig(item, 'slimVideoMetadataSectionRenderer', 'contents'))) {
+      for (const sub of asArr(
+        dig(item, 'slimVideoMetadataSectionRenderer', 'contents'),
+      )) {
         const svir = dig(sub, 'slimVideoInformationRenderer');
         if (svir) title = runsText(dig(svir, 'title', 'runs'));
 
         const sor = dig(sub, 'slimOwnerRenderer');
         if (sor) {
           channel = runsText(dig(sor, 'title', 'runs'));
-          subs = runsText(dig(sor, 'collapsedSubtitle', 'runs')) ||
-                 asStr(dig(sor, 'collapsedSubtitle', 'simpleText'));
+          subs =
+            runsText(dig(sor, 'collapsedSubtitle', 'runs')) ||
+            asStr(dig(sor, 'collapsedSubtitle', 'simpleText'));
         }
       }
     }
@@ -202,15 +235,31 @@ function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouT
     // Description is in a named engagement panel
     for (const panel of asArr(dig(data, 'engagementPanels'))) {
       const epslr = dig(panel, 'engagementPanelSectionListRenderer');
-      if (asStr(dig(epslr, 'panelIdentifier')) !== 'video-description-ep-identifier') continue;
-      for (const item of asArr(dig(epslr, 'content', 'structuredDescriptionContentRenderer', 'items'))) {
-        const body = dig(item, 'expandableVideoDescriptionBodyRenderer', 'attributedDescriptionBodyText', 'content');
-        if (typeof body === 'string' && body) { description = body; break; }
+      if (
+        asStr(dig(epslr, 'panelIdentifier')) !==
+        'video-description-ep-identifier'
+      )
+        continue;
+      for (const item of asArr(
+        dig(epslr, 'content', 'structuredDescriptionContentRenderer', 'items'),
+      )) {
+        const body = dig(
+          item,
+          'expandableVideoDescriptionBodyRenderer',
+          'attributedDescriptionBodyText',
+          'content',
+        );
+        if (typeof body === 'string' && body) {
+          description = body;
+          break;
+        }
       }
     }
   }
 
-  diag?.push(`extracted — title: ${title.slice(0, 60)}, channel: ${channel}, desc.length: ${description.length}`);
+  diag?.push(
+    `extracted — title: ${title.slice(0, 60)}, channel: ${channel}, desc.length: ${description.length}`,
+  );
   if (!title && !description) return null;
   return { title, channel, subs, description: normalizeText(description) };
 }
@@ -243,7 +292,7 @@ function asArr(v: unknown): unknown[] {
  */
 function runsText(runs: unknown): string {
   return asArr(runs)
-    .map(r => asStr(dig(r, 'text')))
+    .map((r) => asStr(dig(r, 'text')))
     .join('');
 }
 
@@ -253,7 +302,7 @@ function runsText(runs: unknown): string {
  * - Collapse consecutive blank lines to one
  */
 function normalizeText(text: string): string {
-  const lines = text.split('\n').map(l => l.trim());
+  const lines = text.split('\n').map((l) => l.trim());
   const result: string[] = [];
   let prevBlank = false;
   for (const line of lines) {

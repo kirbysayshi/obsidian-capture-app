@@ -1,4 +1,6 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -29,11 +31,13 @@
   }
 }
 
-html, body {
+html,
+body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
 }
@@ -54,9 +58,9 @@ label {
   letter-spacing: 0.04em;
 }
 
-input[type="text"],
-input[type="url"],
-input[type="datetime-local"],
+input[type='text'],
+input[type='url'],
+input[type='datetime-local'],
 textarea {
   width: 100%;
   background: var(--surface2);
@@ -71,9 +75,9 @@ textarea {
   resize: vertical;
 }
 
-input[type="text"]:focus,
-input[type="url"]:focus,
-input[type="datetime-local"]:focus,
+input[type='text']:focus,
+input[type='url']:focus,
+input[type='datetime-local']:focus,
 textarea:focus {
   border-color: var(--accent);
 }
@@ -160,7 +164,7 @@ button.danger {
 }
 
 /* Override global width:100% so flex controls sizing */
-.name-emoji-row input[type="text"] {
+.name-emoji-row input[type='text'] {
   width: auto;
 }
 
@@ -203,7 +207,7 @@ button.danger {
   min-height: 44px;
 }
 
-.checkbox-row input[type="checkbox"] {
+.checkbox-row input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: var(--accent);
@@ -271,7 +275,7 @@ button.danger {
   cursor: pointer;
 }
 
-.prop-bool-default input[type="checkbox"] {
+.prop-bool-default input[type='checkbox'] {
   width: 16px;
   height: 16px;
   accent-color: var(--accent);
@@ -481,7 +485,9 @@ button.danger {
   font-weight: normal;
   text-align: left;
   margin-bottom: 10px;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .instance-option:hover {
@@ -536,9 +542,9 @@ button.danger {
 }
 
 .update-banner .btn-refresh {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
-  border: 1px solid rgba(255,255,255,0.4);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   min-height: 32px;
   padding: 0 12px;
   font-size: 0.85rem;
@@ -547,7 +553,7 @@ button.danger {
 }
 
 .update-banner .btn-refresh:hover {
-  background: rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* ---- Use view ---- */
@@ -810,7 +816,7 @@ button.danger {
   white-space: nowrap;
 }
 
-.loading-indicator:not([style*="hidden"])::after {
+.loading-indicator:not([style*='hidden'])::after {
   content: '';
   display: inline-block;
   width: 11px;
@@ -842,7 +848,9 @@ button.danger {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ---- Debug console ---- */
@@ -886,7 +894,8 @@ button.danger {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
-  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+  font-family:
+    ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text-muted);

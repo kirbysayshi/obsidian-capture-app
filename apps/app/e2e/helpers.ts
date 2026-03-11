@@ -15,7 +15,9 @@ export interface Fixture {
 }
 
 /** Parse a minimal YAML subset: scalar strings and one string-list field. */
-export function parseFrontmatter(text: string): Record<string, string | string[]> {
+export function parseFrontmatter(
+  text: string,
+): Record<string, string | string[]> {
   const fm: Record<string, string | string[]> = {};
   let currentListKey: string | null = null;
   for (const line of text.split('\n')) {
@@ -25,7 +27,8 @@ export function parseFrontmatter(text: string): Record<string, string | string[]
       const val = listItem[1];
       // Strip surrounding single or double quotes used as YAML string delimiters
       (fm[currentListKey] as string[]).push(
-        (val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))
+        (val.startsWith("'") && val.endsWith("'")) ||
+          (val.startsWith('"') && val.endsWith('"'))
           ? val.slice(1, -1)
           : val,
       );
@@ -62,15 +65,19 @@ export function parseFixture(filePath: string): Fixture {
 }
 
 export const FIXTURES: Fixture[] = readdirSync(FIXTURES_DIR)
-  .filter(f => f.endsWith('.md'))
-  .map(f => parseFixture(join(FIXTURES_DIR, f)));
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => parseFixture(join(FIXTURES_DIR, f)));
 
 export const VAULT = 'TestVault';
 export const FOLDER = 'Inbox';
-export const INSTANCES_JSON = JSON.stringify([{ vault: VAULT, folder: FOLDER }]);
-export const INSTANCES_PARAM = encodeURIComponent(btoa(
-  Array.from(new TextEncoder().encode(INSTANCES_JSON))
-    .map(b => String.fromCharCode(b))
-    .join(''),
-));
+export const INSTANCES_JSON = JSON.stringify([
+  { vault: VAULT, folder: FOLDER },
+]);
+export const INSTANCES_PARAM = encodeURIComponent(
+  btoa(
+    Array.from(new TextEncoder().encode(INSTANCES_JSON))
+      .map((b) => String.fromCharCode(b))
+      .join(''),
+  ),
+);
 export const CAPTURE_BASE = `http://localhost:5174/?instances=${INSTANCES_PARAM}`;

@@ -1,7 +1,16 @@
-import { encodeInstances, decodeInstances, decodeConfig, type Config, type Prop } from '../lib/config.js';
+import {
+  encodeInstances,
+  decodeInstances,
+  decodeConfig,
+  type Config,
+  type Prop,
+} from '../lib/config.js';
 import { generateBookmarklet } from '../lib/bookmarklet.js';
 
-export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | null): void {
+export function renderConfigure(
+  root: HTMLElement,
+  prefill?: URLSearchParams | null,
+): void {
   root.innerHTML = `
     <div class="configure-view">
       <h1>Obsidian Capture</h1>
@@ -74,25 +83,38 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   `;
 
   const instancesList = root.querySelector<HTMLElement>('#instancesList')!;
-  const globalNameInput = root.querySelector<HTMLInputElement>('#globalNameInput')!;
-  const globalEmojiInput = root.querySelector<HTMLInputElement>('#globalEmojiInput')!;
-  const scraperUrlInput = root.querySelector<HTMLInputElement>('#scraperUrlInput')!;
-  const scraperSecretInput = root.querySelector<HTMLInputElement>('#scraperSecretInput')!;
-  const btnAddInstance = root.querySelector<HTMLButtonElement>('#btnAddInstance')!;
+  const globalNameInput =
+    root.querySelector<HTMLInputElement>('#globalNameInput')!;
+  const globalEmojiInput =
+    root.querySelector<HTMLInputElement>('#globalEmojiInput')!;
+  const scraperUrlInput =
+    root.querySelector<HTMLInputElement>('#scraperUrlInput')!;
+  const scraperSecretInput = root.querySelector<HTMLInputElement>(
+    '#scraperSecretInput',
+  )!;
+  const btnAddInstance =
+    root.querySelector<HTMLButtonElement>('#btnAddInstance')!;
   const btnGenerate = root.querySelector<HTMLButtonElement>('#btnGenerate')!;
   const outputSection = root.querySelector<HTMLElement>('#outputSection')!;
   const useUrlInput = root.querySelector<HTMLInputElement>('#useUrlInput')!;
   const btnCopyUrl = root.querySelector<HTMLButtonElement>('#btnCopyUrl')!;
   const btnOpenUrl = root.querySelector<HTMLButtonElement>('#btnOpenUrl')!;
-  const bookmarkletLink = root.querySelector<HTMLAnchorElement>('#bookmarkletLink')!;
-  const shortcutUrlInput = root.querySelector<HTMLInputElement>('#shortcutUrlInput')!;
-  const btnCopyShortcutUrl = root.querySelector<HTMLButtonElement>('#btnCopyShortcutUrl')!;
+  const bookmarkletLink =
+    root.querySelector<HTMLAnchorElement>('#bookmarkletLink')!;
+  const shortcutUrlInput =
+    root.querySelector<HTMLInputElement>('#shortcutUrlInput')!;
+  const btnCopyShortcutUrl = root.querySelector<HTMLButtonElement>(
+    '#btnCopyShortcutUrl',
+  )!;
   const staleNotice = root.querySelector<HTMLElement>('#staleNotice')!;
   let lastGeneratedSnapshot = '';
 
   // ── Instance card factory ─────────────────────────────────────────────────
 
-  function createInstanceCard(cfg?: Partial<Config>, expanded = true): HTMLElement {
+  function createInstanceCard(
+    cfg?: Partial<Config>,
+    expanded = true,
+  ): HTMLElement {
     const card = document.createElement('div');
     card.className = 'instance-card';
     card.dataset.expanded = expanded ? 'true' : 'false';
@@ -149,16 +171,28 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     `;
 
     const body = card.querySelector<HTMLElement>('.instance-body')!;
-    const toggleBtn = card.querySelector<HTMLButtonElement>('.instance-toggle')!;
-    const removeBtn = card.querySelector<HTMLButtonElement>('.btn-remove-instance')!;
+    const toggleBtn =
+      card.querySelector<HTMLButtonElement>('.instance-toggle')!;
+    const removeBtn = card.querySelector<HTMLButtonElement>(
+      '.btn-remove-instance',
+    )!;
     const sortUpBtn = card.querySelector<HTMLButtonElement>('.btn-sort-up')!;
-    const sortDownBtn = card.querySelector<HTMLButtonElement>('.btn-sort-down')!;
-    const headerLabelEl = card.querySelector<HTMLElement>('.instance-header-label')!;
-    const emojiInput = card.querySelector<HTMLInputElement>('.shortcut-emoji-input')!;
-    const nameInput = card.querySelector<HTMLInputElement>('.shortcut-name-input')!;
-    const canvasCheckbox = card.querySelector<HTMLInputElement>('.canvas-checkbox')!;
+    const sortDownBtn =
+      card.querySelector<HTMLButtonElement>('.btn-sort-down')!;
+    const headerLabelEl = card.querySelector<HTMLElement>(
+      '.instance-header-label',
+    )!;
+    const emojiInput = card.querySelector<HTMLInputElement>(
+      '.shortcut-emoji-input',
+    )!;
+    const nameInput = card.querySelector<HTMLInputElement>(
+      '.shortcut-name-input',
+    )!;
+    const canvasCheckbox =
+      card.querySelector<HTMLInputElement>('.canvas-checkbox')!;
     const propsSection = card.querySelector<HTMLElement>('.props-section')!;
-    const canvasPropsNote = card.querySelector<HTMLElement>('.canvas-props-note')!;
+    const canvasPropsNote =
+      card.querySelector<HTMLElement>('.canvas-props-note')!;
     const propsList = card.querySelector<HTMLElement>('.props-list')!;
     const btnAddProp = card.querySelector<HTMLButtonElement>('.btn-add-prop')!;
 
@@ -195,7 +229,10 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
 
     // Update header label live
     function refreshLabel(): void {
-      headerLabelEl.textContent = makeHeaderLabel(emojiInput.value.trim(), nameInput.value.trim());
+      headerLabelEl.textContent = makeHeaderLabel(
+        emojiInput.value.trim(),
+        nameInput.value.trim(),
+      );
     }
     emojiInput.addEventListener('input', refreshLabel);
     nameInput.addEventListener('input', refreshLabel);
@@ -226,7 +263,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
       const typeIcon = row.querySelector<HTMLButtonElement>('.prop-type-icon')!;
       const valInput = row.querySelector<HTMLInputElement>('.prop-val')!;
       const boolDefault = row.querySelector<HTMLElement>('.prop-bool-default')!;
-      const boolCheck = row.querySelector<HTMLInputElement>('.prop-bool-check')!;
+      const boolCheck =
+        row.querySelector<HTMLInputElement>('.prop-bool-check')!;
 
       function applyType(t: Prop['type']): void {
         row.dataset.propType = t;
@@ -245,16 +283,18 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
         updateStaleNotice();
       });
       boolCheck.addEventListener('change', updateStaleNotice);
-      row.querySelector<HTMLButtonElement>('.btn-remove-prop')!.addEventListener('click', () => {
-        row.remove();
-        updateStaleNotice();
-      });
+      row
+        .querySelector<HTMLButtonElement>('.btn-remove-prop')!
+        .addEventListener('click', () => {
+          row.remove();
+          updateStaleNotice();
+        });
       propsList.appendChild(row);
     }
 
     // Prefill props
     if (cfg?.props) {
-      cfg.props.forEach(p => addPropRow(p.k, p.v, p.type));
+      cfg.props.forEach((p) => addPropRow(p.k, p.v, p.type));
     }
 
     btnAddProp.addEventListener('click', () => {
@@ -266,33 +306,62 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   }
 
   function readCard(card: HTMLElement): Config {
-    const vault = card.querySelector<HTMLInputElement>('.vault-input')!.value.trim();
-    const folder = card.querySelector<HTMLInputElement>('.folder-input')!.value.trim();
-    const canvas = card.querySelector<HTMLInputElement>('.canvas-checkbox')!.checked;
-    const name = card.querySelector<HTMLInputElement>('.shortcut-name-input')!.value.trim();
-    const emoji = card.querySelector<HTMLInputElement>('.shortcut-emoji-input')!.value.trim();
+    const vault = card
+      .querySelector<HTMLInputElement>('.vault-input')!
+      .value.trim();
+    const folder = card
+      .querySelector<HTMLInputElement>('.folder-input')!
+      .value.trim();
+    const canvas =
+      card.querySelector<HTMLInputElement>('.canvas-checkbox')!.checked;
+    const name = card
+      .querySelector<HTMLInputElement>('.shortcut-name-input')!
+      .value.trim();
+    const emoji = card
+      .querySelector<HTMLInputElement>('.shortcut-emoji-input')!
+      .value.trim();
     const propsList = card.querySelector<HTMLElement>('.props-list')!;
-    const props: Prop[] = canvas ? [] : Array.from(propsList.querySelectorAll<HTMLElement>('.prop-row')).map(row => {
-      const k = row.querySelector<HTMLInputElement>('.prop-key')!.value.trim();
-      const type = (row.dataset.propType || 'text') as Prop['type'];
-      const v = type === 'boolean'
-        ? (row.querySelector<HTMLInputElement>('.prop-bool-check')!.checked ? 'true' : 'false')
-        : row.querySelector<HTMLInputElement>('.prop-val')!.value.trim();
-      return { k, v, type };
-    }).filter(p => p.k);
+    const props: Prop[] = canvas
+      ? []
+      : Array.from(propsList.querySelectorAll<HTMLElement>('.prop-row'))
+          .map((row) => {
+            const k = row
+              .querySelector<HTMLInputElement>('.prop-key')!
+              .value.trim();
+            const type = (row.dataset.propType || 'text') as Prop['type'];
+            const v =
+              type === 'boolean'
+                ? row.querySelector<HTMLInputElement>('.prop-bool-check')!
+                    .checked
+                  ? 'true'
+                  : 'false'
+                : row
+                    .querySelector<HTMLInputElement>('.prop-val')!
+                    .value.trim();
+            return { k, v, type };
+          })
+          .filter((p) => p.k);
     return { vault, folder, canvas, name, emoji, props };
   }
 
   function readAllInstances(): Config[] {
-    return Array.from(instancesList.querySelectorAll<HTMLElement>('.instance-card')).map(readCard);
+    return Array.from(
+      instancesList.querySelectorAll<HTMLElement>('.instance-card'),
+    ).map(readCard);
   }
 
   function updateCardButtons(): void {
-    const cards = Array.from(instancesList.querySelectorAll<HTMLElement>('.instance-card'));
+    const cards = Array.from(
+      instancesList.querySelectorAll<HTMLElement>('.instance-card'),
+    );
     cards.forEach((card, i) => {
-      card.querySelector<HTMLButtonElement>('.btn-remove-instance')!.style.display = cards.length === 1 ? 'none' : '';
-      card.querySelector<HTMLButtonElement>('.btn-sort-up')!.style.display = i === 0 ? 'none' : '';
-      card.querySelector<HTMLButtonElement>('.btn-sort-down')!.style.display = i === cards.length - 1 ? 'none' : '';
+      card.querySelector<HTMLButtonElement>(
+        '.btn-remove-instance',
+      )!.style.display = cards.length === 1 ? 'none' : '';
+      card.querySelector<HTMLButtonElement>('.btn-sort-up')!.style.display =
+        i === 0 ? 'none' : '';
+      card.querySelector<HTMLButtonElement>('.btn-sort-down')!.style.display =
+        i === cards.length - 1 ? 'none' : '';
     });
   }
 
@@ -308,7 +377,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
 
   function updateStaleNotice(): void {
     if (outputSection.style.display === 'none') return;
-    staleNotice.style.display = getSnapshot() === lastGeneratedSnapshot ? 'none' : 'block';
+    staleNotice.style.display =
+      getSnapshot() === lastGeneratedSnapshot ? 'none' : 'block';
   }
 
   function addCard(cfg?: Partial<Config>, expanded = false): void {
@@ -320,15 +390,18 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   // ── Listen for changes ────────────────────────────────────────────────────
 
   root.addEventListener('input', (e) => {
-    if (!(e.target as HTMLElement).closest('#outputSection')) updateStaleNotice();
+    if (!(e.target as HTMLElement).closest('#outputSection'))
+      updateStaleNotice();
   });
   root.addEventListener('change', (e) => {
-    if (!(e.target as HTMLElement).closest('#outputSection')) updateStaleNotice();
+    if (!(e.target as HTMLElement).closest('#outputSection'))
+      updateStaleNotice();
   });
 
   // ── Prefill or blank start ────────────────────────────────────────────────
 
-  scraperUrlInput.value = prefill?.get('su') ?? import.meta.env.VITE_SCRAPER_URL ?? '';
+  scraperUrlInput.value =
+    prefill?.get('su') ?? import.meta.env.VITE_SCRAPER_URL ?? '';
   scraperSecretInput.value = prefill?.get('ss') ?? '';
 
   if (prefill) {
@@ -364,7 +437,9 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
 
   btnGenerate.addEventListener('click', () => {
     const instances = readAllInstances();
-    const cards = Array.from(instancesList.querySelectorAll<HTMLElement>('.instance-card'));
+    const cards = Array.from(
+      instancesList.querySelectorAll<HTMLElement>('.instance-card'),
+    );
     for (let i = 0; i < instances.length; i++) {
       const missingVault = !instances[i].vault;
       const missingFolder = !instances[i].folder;
@@ -373,10 +448,16 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
         const card = cards[i];
         if (card.dataset.expanded !== 'true') {
           card.dataset.expanded = 'true';
-          card.querySelector<HTMLButtonElement>('.instance-toggle')!.textContent = '▼';
+          card.querySelector<HTMLButtonElement>(
+            '.instance-toggle',
+          )!.textContent = '▼';
           card.querySelector<HTMLElement>('.instance-body')!.style.display = '';
         }
-        card.querySelector<HTMLInputElement>(missingVault ? '.vault-input' : '.folder-input')?.focus();
+        card
+          .querySelector<HTMLInputElement>(
+            missingVault ? '.vault-input' : '.folder-input',
+          )
+          ?.focus();
         return;
       }
     }
@@ -392,7 +473,8 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
     if (scraperSecret) params.set('ss', scraperSecret);
     const useUrl = `${window.location.origin}${window.location.pathname}?${params}`;
     const firstInstance = instances[0];
-    const displayName = globalName || firstInstance.name || 'Capture to Obsidian';
+    const displayName =
+      globalName || firstInstance.name || 'Capture to Obsidian';
     const displayEmoji = globalEmoji || firstInstance.emoji || '⚡';
 
     lastGeneratedSnapshot = getSnapshot();
@@ -418,21 +500,31 @@ export function renderConfigure(root: HTMLElement, prefill?: URLSearchParams | n
   });
 
   btnCopyUrl.addEventListener('click', () => {
-    navigator.clipboard.writeText(useUrlInput.value).then(() => {
-      btnCopyUrl.textContent = 'Copied!';
-      setTimeout(() => { btnCopyUrl.textContent = 'Copy'; }, 1500);
-    }).catch(() => {
-      useUrlInput.select();
-    });
+    navigator.clipboard
+      .writeText(useUrlInput.value)
+      .then(() => {
+        btnCopyUrl.textContent = 'Copied!';
+        setTimeout(() => {
+          btnCopyUrl.textContent = 'Copy';
+        }, 1500);
+      })
+      .catch(() => {
+        useUrlInput.select();
+      });
   });
 
   btnCopyShortcutUrl.addEventListener('click', () => {
-    navigator.clipboard.writeText(shortcutUrlInput.value).then(() => {
-      btnCopyShortcutUrl.textContent = 'Copied!';
-      setTimeout(() => { btnCopyShortcutUrl.textContent = 'Copy'; }, 1500);
-    }).catch(() => {
-      shortcutUrlInput.select();
-    });
+    navigator.clipboard
+      .writeText(shortcutUrlInput.value)
+      .then(() => {
+        btnCopyShortcutUrl.textContent = 'Copied!';
+        setTimeout(() => {
+          btnCopyShortcutUrl.textContent = 'Copy';
+        }, 1500);
+      })
+      .catch(() => {
+        shortcutUrlInput.select();
+      });
   });
 }
 
@@ -453,7 +545,9 @@ function escHtml(str: string): string {
 /** Detect iOS — covers iPhone, iPad (including iPad reporting as MacIntel with touch). */
 function isIOS(): boolean {
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
-  return navigator.platform === 'MacIntel'
-    && navigator.maxTouchPoints > 1
-    && 'standalone' in navigator;
+  return (
+    navigator.platform === 'MacIntel' &&
+    navigator.maxTouchPoints > 1 &&
+    'standalone' in navigator
+  );
 }

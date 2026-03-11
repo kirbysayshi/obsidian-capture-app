@@ -5,9 +5,7 @@ const { defaultBrowserType: _a, ...iPhoneSE } = devices['iPhone SE'];
 
 /** Generate a safe screenshot path from the test's title hierarchy. */
 function ss(testInfo: TestInfo, suffix = ''): string {
-  const safe = testInfo.titlePath
-    .join(' - ')
-    .replace(/[^a-z0-9\-_. ]/gi, '_');
+  const safe = testInfo.titlePath.join(' - ').replace(/[^a-z0-9\-_. ]/gi, '_');
   return `e2e/screenshots/${safe}${suffix ? `-${suffix}` : ''}.png`;
 }
 
@@ -15,7 +13,7 @@ function ss(testInfo: TestInfo, suffix = ''): string {
 function toBase64(str: string): string {
   return btoa(
     Array.from(new TextEncoder().encode(str))
-      .map(b => String.fromCharCode(b))
+      .map((b) => String.fromCharCode(b))
       .join(''),
   );
 }
@@ -37,7 +35,7 @@ interface InstanceConfig {
 
 /** Build a ?instances= URL for one or more configs. */
 function instancesUrl(configs: InstanceConfig[]): string {
-  const data = configs.map(cfg => ({
+  const data = configs.map((cfg) => ({
     vault: cfg.vault,
     ...(cfg.folder && { folder: cfg.folder }),
     ...(cfg.name && { name: cfg.name }),
@@ -65,10 +63,12 @@ test.describe('Configure view', () => {
 test.describe('Emoji row layout', () => {
   test.use({ ...iPhoneSE });
 
-  test('emoji input is small, name input fills remaining space', async ({ page }, testInfo) => {
+  test('emoji input is small, name input fills remaining space', async ({
+    page,
+  }, testInfo) => {
     await page.goto('/');
     const emojiBox = await page.locator('.shortcut-emoji-input').boundingBox();
-    const nameBox  = await page.locator('.shortcut-name-input').boundingBox();
+    const nameBox = await page.locator('.shortcut-name-input').boundingBox();
     expect(emojiBox?.width).toBeLessThanOrEqual(60);
     expect(nameBox?.width).toBeGreaterThan(150);
     expect(nameBox?.width).toBeGreaterThan(emojiBox?.width ?? Infinity);
@@ -79,7 +79,9 @@ test.describe('Emoji row layout', () => {
 // ── Stale notice ──────────────────────────────────────────────────────────────
 
 test.describe('Stale notice', () => {
-  test('hidden after Generate, shown on edit, cleared on revert', async ({ page }) => {
+  test('hidden after Generate, shown on edit, cleared on revert', async ({
+    page,
+  }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'TestVault');
     await page.fill('.folder-input', 'Inbox');
@@ -112,7 +114,9 @@ test.describe('Stale notice', () => {
 // ── Boolean props (configure) ─────────────────────────────────────────────────
 
 test.describe('Boolean props — configure view', () => {
-  test('type icon starts as text (≡), toggles to boolean (☑)', async ({ page }, testInfo) => {
+  test('type icon starts as text (≡), toggles to boolean (☑)', async ({
+    page,
+  }, testInfo) => {
     await page.goto('/');
     await page.click('.btn-add-prop');
 
@@ -133,14 +137,16 @@ test.describe('Boolean props — configure view', () => {
     await expect(page.locator('.prop-val')).toBeVisible();
   });
 
-  test('default value checkbox is reflected in generated URL', async ({ page }) => {
+  test('default value checkbox is reflected in generated URL', async ({
+    page,
+  }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'Vault');
     await page.fill('.folder-input', 'Inbox');
     await page.click('.btn-add-prop');
     await page.fill('.prop-key', 'published');
-    await page.click('.prop-type-icon');          // switch to boolean
-    await page.click('.prop-bool-check');          // set default = true
+    await page.click('.prop-type-icon'); // switch to boolean
+    await page.click('.prop-bool-check'); // set default = true
     await page.click('#btnGenerate');
 
     const url = await page.locator('#useUrlInput').inputValue();
@@ -148,11 +154,19 @@ test.describe('Boolean props — configure view', () => {
 
     // Decode the instances param and verify
     const params = new URL(url).searchParams;
-    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{ props: PropConfig[] }>;
-    expect(instances[0].props[0]).toMatchObject({ k: 'published', type: 'boolean', v: 'true' });
+    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{
+      props: PropConfig[];
+    }>;
+    expect(instances[0].props[0]).toMatchObject({
+      k: 'published',
+      type: 'boolean',
+      v: 'true',
+    });
   });
 
-  test('stale notice responds to boolean default checkbox change', async ({ page }) => {
+  test('stale notice responds to boolean default checkbox change', async ({
+    page,
+  }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'Vault');
     await page.fill('.folder-input', 'Inbox');
@@ -172,41 +186,70 @@ test.describe('Boolean props — configure view', () => {
 // ── Boolean props (use view) ──────────────────────────────────────────────────
 
 test.describe('Boolean props — use view', () => {
-  test('boolean prop renders as checkbox defaulting to false', async ({ page }, testInfo) => {
-    const url = instancesUrl([{ vault: 'Vault', props: [{ k: 'published', v: 'false', type: 'boolean' }] }]);
+  test('boolean prop renders as checkbox defaulting to false', async ({
+    page,
+  }, testInfo) => {
+    const url = instancesUrl([
+      {
+        vault: 'Vault',
+        props: [{ k: 'published', v: 'false', type: 'boolean' }],
+      },
+    ]);
     await page.goto(url);
 
     const cb = page.locator('.bool-prop-checkbox');
     await expect(cb).toBeVisible();
     await expect(cb).not.toBeChecked();
-    await expect(page.locator('.bool-prop-checkbox + span, .bool-prop-checkbox ~ span')).toContainText('published');
+    await expect(
+      page.locator('.bool-prop-checkbox + span, .bool-prop-checkbox ~ span'),
+    ).toContainText('published');
     await page.screenshot({ path: ss(testInfo), fullPage: true });
   });
 
-  test('boolean prop renders checked when default is true', async ({ page }) => {
-    const url = instancesUrl([{ vault: 'Vault', props: [{ k: 'published', v: 'true', type: 'boolean' }] }]);
+  test('boolean prop renders checked when default is true', async ({
+    page,
+  }) => {
+    const url = instancesUrl([
+      {
+        vault: 'Vault',
+        props: [{ k: 'published', v: 'true', type: 'boolean' }],
+      },
+    ]);
     await page.goto(url);
 
     await expect(page.locator('.bool-prop-checkbox')).toBeChecked();
   });
 
-  test('text props do not appear as checkboxes in use view', async ({ page }) => {
-    const url = instancesUrl([{ vault: 'Vault', props: [{ k: 'category', v: 'web', type: 'text' }] }]);
+  test('text props do not appear as checkboxes in use view', async ({
+    page,
+  }) => {
+    const url = instancesUrl([
+      { vault: 'Vault', props: [{ k: 'category', v: 'web', type: 'text' }] },
+    ]);
     await page.goto(url);
     await expect(page.locator('.bool-prop-checkbox')).toHaveCount(0);
   });
 
-  test('toggled boolean prop value appears in saved note frontmatter', async ({ page }) => {
-    const url = instancesUrl([{ vault: 'Vault', folder: 'Inbox', props: [{ k: 'published', v: 'false', type: 'boolean' }] }]);
+  test('toggled boolean prop value appears in saved note frontmatter', async ({
+    page,
+  }) => {
+    const url = instancesUrl([
+      {
+        vault: 'Vault',
+        folder: 'Inbox',
+        props: [{ k: 'published', v: 'false', type: 'boolean' }],
+      },
+    ]);
     await page.goto(url);
 
-    const uriPromise = page.evaluate(() =>
-      new Promise<string>(resolve =>
-        window.addEventListener('message', (e: MessageEvent) => {
-          if ((e.data as { type?: string })?.type === 'obsidianUri')
-            resolve((e.data as { url: string }).url);
-        }),
-      ),
+    const uriPromise = page.evaluate(
+      () =>
+        new Promise<string>((resolve) =>
+          window.addEventListener('message', (e: MessageEvent) => {
+            if ((e.data as { type?: string })?.type === 'obsidianUri')
+              resolve((e.data as { url: string }).url);
+          }),
+        ),
     );
 
     await page.fill('#fieldWhat', 'Test');
@@ -214,7 +257,8 @@ test.describe('Boolean props — use view', () => {
     await page.locator('#btnSave').click();
 
     const uri = await uriPromise;
-    const content = new URLSearchParams(uri.slice(uri.indexOf('?') + 1)).get('content') ?? '';
+    const content =
+      new URLSearchParams(uri.slice(uri.indexOf('?') + 1)).get('content') ?? '';
     expect(content).toContain('published: true');
   });
 });
@@ -222,17 +266,20 @@ test.describe('Boolean props — use view', () => {
 // ── When field ────────────────────────────────────────────────────────────────
 
 test.describe('When field', () => {
-  test('chosen date appears in filename and created frontmatter', async ({ page }) => {
+  test('chosen date appears in filename and created frontmatter', async ({
+    page,
+  }) => {
     const url = instancesUrl([{ vault: 'Vault', folder: 'Inbox' }]);
     await page.goto(url);
 
-    const uriPromise = page.evaluate(() =>
-      new Promise<string>(resolve =>
-        window.addEventListener('message', (e: MessageEvent) => {
-          if ((e.data as { type?: string })?.type === 'obsidianUri')
-            resolve((e.data as { url: string }).url);
-        }),
-      ),
+    const uriPromise = page.evaluate(
+      () =>
+        new Promise<string>((resolve) =>
+          window.addEventListener('message', (e: MessageEvent) => {
+            if ((e.data as { type?: string })?.type === 'obsidianUri')
+              resolve((e.data as { url: string }).url);
+          }),
+        ),
     );
 
     await page.fill('#fieldWhat', 'Test capture');
@@ -253,7 +300,9 @@ test.describe('Use view', () => {
   test.use({ ...iPhoneSE });
 
   test('shows vault info and configure link', async ({ page }) => {
-    const url = instancesUrl([{ vault: 'MyVault', folder: 'Inbox', name: 'Capture', emoji: '📎' }]);
+    const url = instancesUrl([
+      { vault: 'MyVault', folder: 'Inbox', name: 'Capture', emoji: '📎' },
+    ]);
     await page.goto(url);
     await expect(page.locator('.vault-info')).toBeVisible();
 
@@ -268,8 +317,16 @@ test.describe('Use view', () => {
 // ── Edit configuration prefill ────────────────────────────────────────────────
 
 test.describe('Edit configuration prefill', () => {
-  test('prefills vault, folder, and name from instances param', async ({ page }) => {
-    const instancesParam = encodeURIComponent(toBase64(JSON.stringify([{ vault: 'MyVault', folder: 'Inbox', name: 'Capture', emoji: '📎' }])));
+  test('prefills vault, folder, and name from instances param', async ({
+    page,
+  }) => {
+    const instancesParam = encodeURIComponent(
+      toBase64(
+        JSON.stringify([
+          { vault: 'MyVault', folder: 'Inbox', name: 'Capture', emoji: '📎' },
+        ]),
+      ),
+    );
     await page.goto(`/?mode=configure&instances=${instancesParam}`);
     await expect(page.locator('.vault-input')).toHaveValue('MyVault');
     await expect(page.locator('.folder-input')).toHaveValue('Inbox');
@@ -277,7 +334,16 @@ test.describe('Edit configuration prefill', () => {
   });
 
   test('prefills boolean prop type and default value', async ({ page }) => {
-    const instancesParam = encodeURIComponent(toBase64(JSON.stringify([{ vault: 'Vault', props: [{ k: 'published', v: 'true', type: 'boolean' }] }])));
+    const instancesParam = encodeURIComponent(
+      toBase64(
+        JSON.stringify([
+          {
+            vault: 'Vault',
+            props: [{ k: 'published', v: 'true', type: 'boolean' }],
+          },
+        ]),
+      ),
+    );
     await page.goto(`/?mode=configure&instances=${instancesParam}`);
 
     await expect(page.locator('.prop-type-icon')).toHaveText('☑');
@@ -307,7 +373,9 @@ test.describe('Multi-instance configure view', () => {
     await expect(cards.nth(1).locator('.vault-input')).toHaveValue('VaultB');
   });
 
-  test('generate produces URL with instances= param (single instance)', async ({ page }) => {
+  test('generate produces URL with instances= param (single instance)', async ({
+    page,
+  }) => {
     await page.goto('/');
     await page.fill('.vault-input', 'Vault');
     await page.fill('.folder-input', 'Inbox');
@@ -331,13 +399,17 @@ test.describe('Multi-instance configure view', () => {
     await page.click('#btnGenerate');
     const url = await page.locator('#useUrlInput').inputValue();
     const params = new URL(url).searchParams;
-    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{ vault: string }>;
+    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{
+      vault: string;
+    }>;
     expect(instances).toHaveLength(2);
     expect(instances[0].vault).toBe('VaultA');
     expect(instances[1].vault).toBe('VaultB');
   });
 
-  test('stale notice triggers when any instance field changes', async ({ page }) => {
+  test('stale notice triggers when any instance field changes', async ({
+    page,
+  }) => {
     await page.goto('/');
     await page.click('#btnAddInstance');
 
@@ -362,8 +434,16 @@ test.describe('Multi-instance configure view', () => {
 
     const url = await page.locator('#useUrlInput').inputValue();
     const params = new URL(url).searchParams;
-    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{ vault: string; folder: string; name: string }>;
-    expect(instances[0]).toMatchObject({ vault: 'MyVault', folder: 'Notes', name: 'My Capture' });
+    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{
+      vault: string;
+      folder: string;
+      name: string;
+    }>;
+    expect(instances[0]).toMatchObject({
+      vault: 'MyVault',
+      folder: 'Notes',
+      name: 'My Capture',
+    });
   });
 });
 
@@ -390,7 +470,9 @@ test.describe('Multi-instance use view', () => {
 
     await expect(page.locator('.instance-option')).toHaveCount(2);
     await expect(page.locator('.instance-option').nth(0)).toContainText('Work');
-    await expect(page.locator('.instance-option').nth(1)).toContainText('Personal');
+    await expect(page.locator('.instance-option').nth(1)).toContainText(
+      'Personal',
+    );
   });
 
   test('clicking option hides picker and shows form', async ({ page }) => {
@@ -419,7 +501,9 @@ test.describe('Multi-instance use view', () => {
     await expect(page.locator('.vault-info')).toContainText('Notes');
   });
 
-  test('single-instance URL skips picker and goes straight to form', async ({ page }) => {
+  test('single-instance URL skips picker and goes straight to form', async ({
+    page,
+  }) => {
     const url = instancesUrl([{ vault: 'OnlyVault', name: 'Solo' }]);
     await page.goto(url);
 
