@@ -2,7 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { serve } from '@hono/node-server';
-import { app } from './app';
+import { app, isRedditPostUrl, fetchRedditPost } from './app';
 
 // ── Upstream mock server ───────────────────────────────────────────────────────
 
@@ -133,6 +133,75 @@ describe('Scraper service', () => {
       Authorization: 'Bearer test-secret',
     });
     assert.equal(resp.status, 502);
+  });
+
+  it('8. isRedditPostUrl: matches /comments/ paths on reddit.com variants only', () => {
+    assert.ok(
+      isRedditPostUrl(
+        new URL('https://www.reddit.com/r/test/comments/abc123/some_title/'),
+      ),
+    );
+    assert.ok(
+      isRedditPostUrl(new URL('https://reddit.com/r/test/comments/abc/')),
+    );
+    assert.ok(
+      isRedditPostUrl(new URL('https://old.reddit.com/r/test/comments/abc/')),
+    );
+    assert.ok(!isRedditPostUrl(new URL('https://www.reddit.com/r/test/new/')));
+    assert.ok(
+      !isRedditPostUrl(new URL('https://example.com/r/test/comments/abc/')),
+    );
+  });
+
+  it('9. fetchRedditPost: parses JSON and returns synthesized HTML', async () => {
+    mockStatusCode = 200;
+    mockBody = JSON.stringify([
+      {
+        data: {
+          children: [
+            { data: { title: 'Test Post', selftext: 'Post body text.' } },
+          ],
+        },
+      },
+    ]);
+    mockRedirectTarget = '';
+
+    const originalUrl =
+      'https://www.reddit.com/r/test/comments/abc123/test_post/';
+    const result = await fetchRedditPost(mockUrl(), originalUrl);
+
+    assert.ok(result.html.includes('<title>Test Post</title>'));
+    assert.ok(result.html.includes('<h1>Test Post</h1>'));
+    assert.ok(result.html.includes('Post body text.'));
+    assert.equal(result.url, originalUrl);
+  });
+
+  it('10. fetchRedditPost: escapes HTML special chars in title/body', async () => {
+    mockStatusCode = 200;
+    mockBody = JSON.stringify([
+      {
+        data: {
+          children: [
+            {
+              data: {
+                title: 'A & B <test>',
+                selftext: 'Body with "quotes" & <tags>',
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    mockRedirectTarget = '';
+
+    const result = await fetchRedditPost(
+      mockUrl(),
+      'https://www.reddit.com/r/test/comments/xyz/',
+    );
+
+    assert.ok(result.html.includes('A &amp; B &lt;test&gt;'));
+    assert.ok(result.html.includes('Body with "quotes" &amp; &lt;tags&gt;'));
+    assert.ok(!result.html.includes('<test>'));
   });
 
   it('7. upstream redirect → 200, url = final URL', async () => {

@@ -13,7 +13,7 @@ app.use(
   }),
 );
 
-function isRedditPostUrl(url: URL): boolean {
+export function isRedditPostUrl(url: URL): boolean {
   const host = url.hostname;
   return (
     (host === 'www.reddit.com' ||
@@ -23,10 +23,10 @@ function isRedditPostUrl(url: URL): boolean {
   );
 }
 
-async function fetchRedditPost(
-  url: URL,
+export async function fetchRedditPost(
+  jsonUrl: string,
+  originalUrl: string,
 ): Promise<{ html: string; url: string }> {
-  const jsonUrl = url.origin + url.pathname.replace(/\/$/, '') + '.json';
   const resp = await fetch(jsonUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (compatible; ObsidianCaptureScraper/1.0)',
@@ -48,7 +48,7 @@ async function fetchRedditPost(
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const html = `<!DOCTYPE html><html><head><title>${esc(title)}</title></head><body><h1>${esc(title)}</h1><p>${esc(body)}</p></body></html>`;
-  return { html, url: url.toString() };
+  return { html, url: originalUrl };
 }
 
 app.get('/fetch', async (c) => {
@@ -84,8 +84,10 @@ app.get('/fetch', async (c) => {
 
   // Reddit: use JSON API to avoid bot detection
   if (isRedditPostUrl(targetUrl)) {
+    const jsonUrl =
+      targetUrl.origin + targetUrl.pathname.replace(/\/$/, '') + '.json';
     try {
-      return c.json(await fetchRedditPost(targetUrl));
+      return c.json(await fetchRedditPost(jsonUrl, targetUrl.toString()));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ error: `Fetch failed: ${msg}` }, 502);

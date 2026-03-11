@@ -429,17 +429,30 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
     // ── Scraper input handler ─────────────────────────────────────────────────
     if (hasScraperConfig) {
+      function getAllScrapeUrls(): string[] {
+        return extractAllUrls(
+          [fieldWhat.value, fieldWho.value, fieldWhy.value].join('\n'),
+        );
+      }
+
       fieldWhat.addEventListener('input', () => {
-        const urls = extractAllUrls(fieldWhat.value);
-        reconcileScrapeEntries(urls);
+        reconcileScrapeEntries(getAllScrapeUrls());
         if (scrapeTimer) clearTimeout(scrapeTimer);
-        if (urls.length === 1 && scrapeEntries[0]?.status === 'pending') {
-          scrapeTimer = setTimeout(
-            () => void doScrapeEntry(scrapeEntries[0]),
-            600,
+        const whatUrls = extractAllUrls(fieldWhat.value);
+        if (whatUrls.length === 1) {
+          const entry = scrapeEntries.find(
+            (e) => e.url === whatUrls[0] && e.status === 'pending',
           );
+          if (entry)
+            scrapeTimer = setTimeout(() => void doScrapeEntry(entry), 600);
         }
       });
+
+      for (const field of [fieldWho as HTMLElement, fieldWhy as HTMLElement]) {
+        field.addEventListener('input', () => {
+          reconcileScrapeEntries(getAllScrapeUrls());
+        });
+      }
     }
 
     // ── Bookmarklet pre-fill ──────────────────────────────────────────────────
