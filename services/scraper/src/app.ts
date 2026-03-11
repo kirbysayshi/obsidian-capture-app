@@ -13,6 +13,44 @@ app.use(
   }),
 );
 
+function isRedditPostUrl(url: URL): boolean {
+  const host = url.hostname;
+  return (
+    (host === 'www.reddit.com' ||
+      host === 'reddit.com' ||
+      host === 'old.reddit.com') &&
+    url.pathname.includes('/comments/')
+  );
+}
+
+async function fetchRedditPost(
+  url: URL,
+): Promise<{ html: string; url: string }> {
+  const jsonUrl = url.origin + url.pathname.replace(/\/$/, '') + '.json';
+  const resp = await fetch(jsonUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; ObsidianCaptureScraper/1.0)',
+      Accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!resp.ok) throw new Error(`Reddit returned ${resp.status}`);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (await resp.json()) as any;
+  const post = data[0]?.data?.children?.[0]?.data;
+  if (!post) throw new Error('Unexpected Reddit JSON structure');
+
+  const title = String(post.title ?? '');
+  const body = String(post.selftext ?? post.url ?? '');
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const html = `<!DOCTYPE html><html><head><title>${esc(title)}</title></head><body><h1>${esc(title)}</h1><p>${esc(body)}</p></body></html>`;
+  return { html, url: url.toString() };
+}
+
 app.get('/fetch', async (c) => {
   // Reject immediately if secret is not configured
   const scraperSecret = process.env.SCRAPER_SECRET;
@@ -42,6 +80,16 @@ app.get('/fetch', async (c) => {
 
   if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
     return c.json({ error: 'Only http/https URLs are supported' }, 400);
+  }
+
+  // Reddit: use JSON API to avoid bot detection
+  if (isRedditPostUrl(targetUrl)) {
+    try {
+      return c.json(await fetchRedditPost(targetUrl));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Fetch failed: ${msg}` }, 502);
+    }
   }
 
   // Fetch upstream
