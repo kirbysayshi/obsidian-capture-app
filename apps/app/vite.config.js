@@ -23,4 +23,7 @@ export default {
     // Injected at build time; compared against version.json at runtime
     __APP_VERSION__: JSON.stringify(gitHash),
   },
+  test: {
+    include: ['src/**/*.test.ts'],
+  },
 };
