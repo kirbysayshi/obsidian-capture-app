@@ -21,6 +21,11 @@ interface ScrapeEntry {
   excluded: boolean;
 }
 
+function toDatetimeLocal(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const instances = decodeInstances(params) ?? [];
   if (instances.length === 0) return;
@@ -82,6 +87,11 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         <div class="field">
           <label for="fieldWhy">Why</label>
           <textarea id="fieldWhy" placeholder="Why does this matter?" rows="3"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="fieldWhen">When</label>
+          <input type="datetime-local" id="fieldWhen">
         </div>
 
         <div id="boolPropsSection"></div>
@@ -300,6 +310,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     const fieldWhat = root.querySelector<HTMLTextAreaElement>('#fieldWhat')!;
     const fieldWho = root.querySelector<HTMLInputElement>('#fieldWho')!;
     const fieldWhy = root.querySelector<HTMLTextAreaElement>('#fieldWhy')!;
+    const fieldWhen = root.querySelector<HTMLInputElement>('#fieldWhen')!;
+    fieldWhen.value = toDatetimeLocal(new Date());
     const btnSave = root.querySelector<HTMLButtonElement>('#btnSave')!;
     const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
     const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink');
@@ -338,6 +350,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       fieldWhat.value = '';
       fieldWho.value = '';
       fieldWhy.value = '';
+      fieldWhen.value = toDatetimeLocal(new Date());
       scrapeEntries = [];
       renderScrapeList();
       for (const prop of booleanProps) {
@@ -386,6 +399,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       const what = fieldWhat.value.trim();
       const who = fieldWho.value.trim();
       const why = fieldWhy.value.trim();
+      const whenDate = fieldWhen.value ? new Date(fieldWhen.value) : new Date();
 
       let slugSource: string;
       let bodyText: string;
@@ -419,7 +433,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       if (config.canvas) {
         filename = `${slug}.canvas`;
       } else {
-        const ts = makeHumanTimestamp();
+        const ts = makeHumanTimestamp(whenDate);
         filename = `${ts} ${slug}.md`;
       }
 
@@ -437,6 +451,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           why,
           bodyText,
           url: primaryUrl,
+          date: whenDate,
         });
         let canvasUrls: string[];
         if (hasScraperConfig && scrapeEntries.length > 0) {
@@ -456,6 +471,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           props: resolvedProps,
           bodyText,
           url: primaryUrl,
+          date: whenDate,
         });
       }
 

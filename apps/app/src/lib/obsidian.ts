@@ -14,6 +14,7 @@ export interface NoteContentParams {
   props?: Prop[];
   bodyText?: string;
   url?: string;
+  date?: Date;
 }
 
 /**
@@ -66,8 +67,9 @@ export function buildNoteContent({
   props = [],
   bodyText = '',
   url = '',
+  date,
 }: NoteContentParams): string {
-  const created = new Date().toISOString().slice(0, 19);
+  const created = (date ?? new Date()).toISOString().slice(0, 19);
   const lines: string[] = ['---'];
   lines.push(`created: ${created}`);
   lines.push(`what: "${escapeFrontmatter(what)}"`);
@@ -103,9 +105,10 @@ export function buildCanvasNoteText({
   why,
   bodyText = '',
   url = '',
+  date,
 }: NoteContentParams): string {
   const lines: string[] = [];
-  lines.push(`**Created:** ${makeHumanTimestamp()}`);
+  lines.push(`**Created:** ${makeHumanTimestamp(date)}`);
   if (what) lines.push(`**What:** ${what}`);
   if (who)  lines.push(`**Who:** ${who}`);
   if (why)  lines.push(`**Why:** ${why}`);

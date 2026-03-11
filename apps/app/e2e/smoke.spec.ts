@@ -195,6 +195,56 @@ test.describe('Boolean props — use view', () => {
     await page.goto(url);
     await expect(page.locator('.bool-prop-checkbox')).toHaveCount(0);
   });
+
+  test('toggled boolean prop value appears in saved note frontmatter', async ({ page }) => {
+    const url = instancesUrl([{ vault: 'Vault', folder: 'Inbox', props: [{ k: 'published', v: 'false', type: 'boolean' }] }]);
+    await page.goto(url);
+
+    const uriPromise = page.evaluate(() =>
+      new Promise<string>(resolve =>
+        window.addEventListener('message', (e: MessageEvent) => {
+          if ((e.data as { type?: string })?.type === 'obsidianUri')
+            resolve((e.data as { url: string }).url);
+        }),
+      ),
+    );
+
+    await page.fill('#fieldWhat', 'Test');
+    await page.locator('.bool-prop-checkbox').check();
+    await page.locator('#btnSave').click();
+
+    const uri = await uriPromise;
+    const content = new URLSearchParams(uri.slice(uri.indexOf('?') + 1)).get('content') ?? '';
+    expect(content).toContain('published: true');
+  });
+});
+
+// ── When field ────────────────────────────────────────────────────────────────
+
+test.describe('When field', () => {
+  test('chosen date appears in filename and created frontmatter', async ({ page }) => {
+    const url = instancesUrl([{ vault: 'Vault', folder: 'Inbox' }]);
+    await page.goto(url);
+
+    const uriPromise = page.evaluate(() =>
+      new Promise<string>(resolve =>
+        window.addEventListener('message', (e: MessageEvent) => {
+          if ((e.data as { type?: string })?.type === 'obsidianUri')
+            resolve((e.data as { url: string }).url);
+        }),
+      ),
+    );
+
+    await page.fill('#fieldWhat', 'Test capture');
+    await page.fill('#fieldWhen', '2024-03-15T09:30');
+    await page.locator('#btnSave').click();
+
+    const uri = await uriPromise;
+    const params = new URLSearchParams(uri.slice(uri.indexOf('?') + 1));
+
+    expect(params.get('file')).toMatch(/^Inbox\/2024-03-15 09\.30 /);
+    expect(params.get('content')).toContain('created: 2024-03-15');
+  });
 });
 
 // ── Use view basics (mobile) ──────────────────────────────────────────────────
