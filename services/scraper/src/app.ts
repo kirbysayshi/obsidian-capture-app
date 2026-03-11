@@ -1,20 +1,17 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 import { fetch } from 'undici';
 
 const app = new Hono();
 
-// CORS headers on every response
-app.use('*', async (c, next) => {
-  await next();
-  const allowedOrigin = process.env.ALLOWED_ORIGIN ?? '*';
-  c.res.headers.set('Access-Control-Allow-Origin', allowedOrigin);
-  c.res.headers.set('Access-Control-Allow-Headers', 'Authorization');
-});
-
-// Preflight
-app.options('/fetch', (c) => {
-  return c.body(null, 204);
-});
+app.use(
+  '*',
+  cors({
+    origin: process.env.ALLOWED_ORIGIN ?? '*',
+    allowHeaders: ['Authorization'],
+    allowMethods: ['GET', 'OPTIONS'],
+  }),
+);
 
 app.get('/fetch', async (c) => {
   // Reject immediately if secret is not configured
