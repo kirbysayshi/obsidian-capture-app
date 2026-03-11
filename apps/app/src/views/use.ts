@@ -8,7 +8,7 @@ import {
   makeReadableSlug,
   makeHumanTimestamp,
 } from '../lib/obsidian.js';
-import { extractContent, extractYouTubeContent, extractFromYtData, isYouTubeVideo } from '../lib/content.js';
+import { extractContent, extractYouTubeContent, isYouTubeVideo } from '../lib/content.js';
 
 type ScrapeStatus = 'pending' | 'loading' | 'done' | 'error';
 interface ScrapeEntry {
@@ -28,102 +28,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
   const isBookmarklet = params.get('mode') === 'bm';
   const scraperConfig = decodeScraperConfig(params);
   const hasScraperConfig = !!scraperConfig.serviceUrl;
-
-  // ── Content extraction (bookmarklet / Shortcuts path) ─────────────────────
-  let extractedUrl = '';
-  let extractedBodyText = '';
-  let extractedTitle = '';
-  let extractionDone = false;
-  let extractionCallbacks: Array<() => void> = [];
-
-  function onExtractionDone(cb: () => void): void {
-    if (extractionDone) { cb(); return; }
-    extractionCallbacks.push(cb);
-  }
-
-  function finishExtraction(): void {
-    extractionDone = true;
-    extractionCallbacks.forEach(cb => cb());
-    extractionCallbacks = [];
-  }
-
-  const debugLines: string[] = [];
-  function dbg(...lines: string[]): void {
-    debugLines.push(...lines);
-  }
-
-  if (isBookmarklet) {
-    const hashData = location.hash.slice(1);
-    const sourceUrl = safeDecodeUri(params.get('url') ?? '');
-    const sourceTitle = safeDecodeUri(params.get('title') ?? '');
-
-    extractedUrl = sourceUrl;
-    dbg(`url: ${sourceUrl}`, `hash.length: ${hashData.length}`, `isYT: ${isYouTubeVideo(sourceUrl)}`);
-
-    if (hashData) {
-      try {
-        const decoded = new TextDecoder().decode(
-          Uint8Array.from(atob(hashData), c => c.charCodeAt(0))
-        );
-        let html: string;
-        let ytDataObj: Record<string, unknown> | null = null;
-        try {
-          const parsed = JSON.parse(decoded) as { html: string; yt?: Record<string, unknown> };
-          html = parsed.html;
-          ytDataObj = parsed.yt ?? null;
-        } catch {
-          html = decoded;
-        }
-        dbg(`html.length: ${html.length}`);
-
-        if (isYouTubeVideo(sourceUrl)) {
-          const diag: string[] = [];
-          const yt = ytDataObj
-            ? extractFromYtData(ytDataObj, diag)
-            : extractYouTubeContent(html, diag);
-          dbg(...diag);
-          extractedTitle = yt?.title || sourceTitle || '';
-
-          if (yt) {
-            const parts: string[] = [];
-            parts.push(`# ${yt.title}`);
-            const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
-            if (channelLine) parts.push(`**Channel:** ${channelLine}`);
-            if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
-            extractedBodyText = parts.join('\n\n');
-            dbg(`result: OK, title="${yt.title.slice(0, 60)}"`);
-          } else {
-            extractedBodyText = '⚠️ Could not extract YouTube metadata — YouTube may have changed their page format.';
-            dbg('result: FAILED');
-          }
-        } else {
-          const article = extractContent(html, sourceUrl);
-          extractedTitle = (article?.title || sourceTitle || '').trim();
-
-          if (article) {
-            const meta: string[] = [];
-            if (article.byline) meta.push(`By: ${article.byline}`);
-            if (article.siteName) meta.push(`Site: ${article.siteName}`);
-            if (article.publishedTime) meta.push(`Published: ${article.publishedTime}`);
-
-            const parts: string[] = [];
-            parts.push(`# ${extractedTitle}`);
-            if (meta.length) parts.push(meta.join(' · '));
-            if (article.excerpt) parts.push(`> ${article.excerpt}`);
-            if (article.textContent) parts.push(article.textContent);
-            extractedBodyText = parts.join('\n\n');
-          }
-        }
-      } catch (e) {
-        dbg(`decode error: ${e}`);
-      }
-    } else {
-      extractedTitle = sourceTitle;
-    }
-    finishExtraction();
-  } else {
-    finishExtraction();
-  }
 
   // ── Apply title/icon ───────────────────────────────────────────────────────
   const firstInstance = instances[0];
@@ -166,7 +70,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
         <div class="field">
           <div class="field-label-row">
             <label for="fieldWhat">What</label>
-            ${isBookmarklet ? '<span class="loading-indicator" id="loadingIndicator">Extracting page content</span>' : ''}
           </div>
           <textarea id="fieldWhat" placeholder="URL, title, notes…" rows="6"></textarea>
         </div>
@@ -183,23 +86,12 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
 
         <div id="boolPropsSection"></div>
 
-        ${!isBookmarklet && hasScraperConfig ? '<div id="scrapeList" class="scrape-list"></div>' : ''}
+        ${hasScraperConfig ? '<div id="scrapeList" class="scrape-list"></div>' : ''}
 
         <div class="btn-row">
           <button class="btn-save" id="btnSave">Save to Obsidian</button>
           <button class="btn-cancel secondary" id="btnCancel">Cancel</button>
         </div>
-
-        ${isBookmarklet ? `
-        <div id="contentPreview" class="content-preview" style="display:none">
-          <label>Clipped content</label>
-          <pre id="contentPreviewText"></pre>
-        </div>` : ''}
-
-        <details id="debugDetails" class="debug-details">
-          <summary>Debug <button id="btnCopyDebug" class="debug-copy-btn" type="button">Copy</button></summary>
-          <pre id="debugLog"></pre>
-        </details>
       </div>
     </div>
   `;
@@ -229,6 +121,12 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     });
   }
 
+  // ── Scrape entry state ─────────────────────────────────────────────────────
+  // Declared before showForm() is called so the bookmarklet pre-fill can access
+  // scrapeEntries synchronously (let is not hoisted like var).
+  let scrapeEntries: ScrapeEntry[] = [];
+  let scrapeTimer: ReturnType<typeof setTimeout> | null = null;
+
   if (instances.length === 1) {
     showForm(firstInstance);
   } else {
@@ -243,10 +141,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       });
     });
   }
-
-  // ── Scrape entry state (non-bookmarklet) ───────────────────────────────────
-  let scrapeEntries: ScrapeEntry[] = [];
-  let scrapeTimer: ReturnType<typeof setTimeout> | null = null;
 
   function reconcileScrapeEntries(urls: string[]): void {
     const existingMap = new Map(scrapeEntries.map(e => [e.url, e]));
@@ -298,17 +192,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           if (article.excerpt) parts.push(`> ${article.excerpt}`);
           if (article.textContent) parts.push(article.textContent);
           entry.bodyText = parts.join('\n\n');
-        } else {
-          const yt = extractYouTubeContent(result.html, diag);
-          if (yt) {
-            entry.title = yt.title;
-            const parts: string[] = [];
-            parts.push(`# ${yt.title}`);
-            const channelLine = [yt.channel, yt.subs].filter(Boolean).join(' · ');
-            if (channelLine) parts.push(`**Channel:** ${channelLine}`);
-            if (yt.description) parts.push(`**Description:**\n\n${yt.description}`);
-            entry.bodyText = parts.join('\n\n');
-          }
         }
       }
       entry.url = result.url;
@@ -418,14 +301,9 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
     const fieldWho = root.querySelector<HTMLInputElement>('#fieldWho')!;
     const fieldWhy = root.querySelector<HTMLTextAreaElement>('#fieldWhy')!;
     const btnSave = root.querySelector<HTMLButtonElement>('#btnSave')!;
-    const loadingIndicator = root.querySelector<HTMLElement>('#loadingIndicator');
-    const contentPreview = root.querySelector<HTMLElement>('#contentPreview');
-    const contentPreviewText = root.querySelector<HTMLElement>('#contentPreviewText');
     const btnCancel = root.querySelector<HTMLButtonElement>('#btnCancel')!;
     const configureLink = root.querySelector<HTMLAnchorElement>('#configureLink');
     const boolPropsSection = root.querySelector<HTMLElement>('#boolPropsSection')!;
-    const debugLog = root.querySelector<HTMLElement>('#debugLog')!;
-    const btnCopyDebug = root.querySelector<HTMLButtonElement>('#btnCopyDebug')!;
     const vaultInfo = root.querySelector<HTMLElement>('#vaultInfo')!;
     const canvasBadge = root.querySelector<HTMLElement>('#canvasBadge')!;
     const captureTitle = root.querySelector<HTMLElement>('#captureTitle')!;
@@ -441,22 +319,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       configureParams.set('mode', 'configure');
       configureLink.href = `${window.location.pathname}?${configureParams}`;
     }
-
-    debugLog.textContent = debugLines.join('\n') + (debugLines.length ? '\n' : '');
-
-    btnCopyDebug.addEventListener('click', (e) => {
-      e.preventDefault();
-      navigator.clipboard.writeText(debugLog.textContent ?? '').then(() => {
-        btnCopyDebug.textContent = 'Copied!';
-        setTimeout(() => { btnCopyDebug.textContent = 'Copy'; }, 1500);
-      }).catch(() => {
-        const sel = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(debugLog);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      });
-    });
 
     boolPropsSection.innerHTML = '';
     const booleanProps = config.props.filter(p => p.type === 'boolean');
@@ -478,8 +340,6 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       fieldWhy.value = '';
       scrapeEntries = [];
       renderScrapeList();
-      if (contentPreview) contentPreview.style.display = 'none';
-      if (contentPreviewText) contentPreviewText.textContent = '';
       for (const prop of booleanProps) {
         const cb = boolPropsSection.querySelector<HTMLInputElement>(`[data-key="${escProp(prop.k)}"]`);
         if (cb) cb.checked = prop.v === 'true';
@@ -499,24 +359,8 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       }
     });
 
-    function populateFromExtraction(): void {
-      if (isBookmarklet) {
-        fieldWhat.value = extractedUrl;
-        if (extractedBodyText && contentPreviewText && contentPreview) {
-          contentPreviewText.textContent = extractedBodyText;
-          contentPreview.style.display = 'block';
-        }
-        loadingIndicator?.remove();
-        fieldWhat.focus();
-      }
-    }
-
-    if (isBookmarklet) {
-      onExtractionDone(populateFromExtraction);
-    }
-
-    // ── Scraper input handler (non-bookmarklet) ───────────────────────────────
-    if (!isBookmarklet && hasScraperConfig) {
+    // ── Scraper input handler ─────────────────────────────────────────────────
+    if (hasScraperConfig) {
       fieldWhat.addEventListener('input', () => {
         const urls = extractAllUrls(fieldWhat.value);
         reconcileScrapeEntries(urls);
@@ -525,6 +369,16 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
           scrapeTimer = setTimeout(() => void doScrapeEntry(scrapeEntries[0]), 600);
         }
       });
+    }
+
+    // ── Bookmarklet pre-fill ──────────────────────────────────────────────────
+    if (isBookmarklet) {
+      const url = safeDecodeUri(params.get('url') ?? '');
+      if (url) {
+        fieldWhat.value = url;
+        reconcileScrapeEntries([url]);
+        scrapeTimer = setTimeout(() => void doScrapeEntry(scrapeEntries[0]), 600);
+      }
     }
 
     // ── Save handler ───────────────────────────────────────────────────────────
@@ -537,11 +391,7 @@ export function renderUse(root: HTMLElement, params: URLSearchParams): void {
       let bodyText: string;
       let primaryUrl: string;
 
-      if (isBookmarklet) {
-        slugSource = extractedTitle || (what.split('\n')[0] ?? 'capture');
-        bodyText = extractedBodyText;
-        primaryUrl = extractedUrl;
-      } else if (hasScraperConfig) {
+      if (hasScraperConfig) {
         const doneEntries = scrapeEntries.filter(e => e.status === 'done' && !e.excluded);
         const firstTitle = doneEntries[0]?.title || '';
         slugSource = firstTitle || (what.split('\n')[0] ?? 'capture');

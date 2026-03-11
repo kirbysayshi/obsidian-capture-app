@@ -1,67 +1,58 @@
 /**
  * E2E tests for the scraper auto-fetch integration.
  *
- * A Node.js fixture HTTP server serves fixture HTML so the real scraper service
- * (started by playwright.config.js on port 8080) can fetch it. The app uses
- * VITE_SCRAPER_URL=http://localhost:8080 from .env.development — no su= param needed.
+ * The scraper endpoint (http://localhost:8080/fetch) is intercepted via
+ * page.route() so tests run offline and fixture URLs match the canonical
+ * form (e.g. https://www.youtube.com/watch?v=...) that isYouTubeVideo()
+ * recognises, exercising the correct extraction path end-to-end.
  */
 
-import { test, expect } from '@playwright/test';
-import http from 'http';
+import { test, expect, type Page } from '@playwright/test';
 import { VAULT, FOLDER, CAPTURE_BASE, FIXTURES } from './helpers.js';
 
-// ── Fixture server ────────────────────────────────────────────────────────────
+// ── Scraper mock ──────────────────────────────────────────────────────────────
 
-let fixtureServer;
-let fixturePort;
-const fixtureMap = new Map();
-
-test.beforeAll(async () => {
-  for (const f of FIXTURES) {
-    const slug = f.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    fixtureMap.set('/' + slug, f);
-  }
-
-  fixtureServer = http.createServer((req, res) => {
-    const f = fixtureMap.get((req.url ?? '/').split('?')[0]);
-    if (f) {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(f.html);
+/**
+ * Intercept all scraper fetches for the page.
+ * Returns fixture HTML for known fixture URLs; 404 JSON for everything else.
+ */
+function mockScraper(page: Page): Promise<void> {
+  return page.route('http://localhost:8080/fetch**', async route => {
+    const reqUrl = new URL(route.request().url());
+    const targetUrl = decodeURIComponent(reqUrl.searchParams.get('url') ?? '');
+    const fixture = FIXTURES.find(f => f.url === targetUrl);
+    if (fixture) {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ url: fixture.url, html: fixture.html }),
+      });
     } else {
-      res.writeHead(404);
-      res.end('Not found');
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Not found' }),
+      });
     }
   });
-
-  await new Promise(resolve => fixtureServer.listen(0, '127.0.0.1', resolve));
-  fixturePort = fixtureServer.address().port;
-});
-
-test.afterAll(async () => {
-  await new Promise(resolve => fixtureServer.close(resolve));
-});
+}
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('Scraper auto-fetch flow', () => {
   for (const fixture of FIXTURES) {
-    const slug = fixture.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-
     test(`scraper: ${fixture.name}`, async ({ page }) => {
-      // Navigate directly to the use view.
-      // In dev, VITE_SCRAPER_URL=http://localhost:8080 so hasScraperConfig is true without su= param.
+      await mockScraper(page);
       await page.goto(CAPTURE_BASE);
 
       // Listen for obsidianUri postMessage before triggering scrape
       const uriPromise = page.evaluate(() =>
-        new Promise(resolve => window.addEventListener('message', e => {
-          if (e.data?.type === 'obsidianUri') resolve(e.data.url);
+        new Promise<string>(resolve => window.addEventListener('message', (e: MessageEvent) => {
+          if ((e.data as { type?: string })?.type === 'obsidianUri') resolve((e.data as { url: string }).url);
         }))
       );
 
-      // Paste local fixture server URL into What field — triggers auto-scrape after 600ms
-      const targetUrl = `http://127.0.0.1:${fixturePort}/${slug}`;
-      await page.fill('#fieldWhat', targetUrl);
+      // Paste canonical fixture URL into What field — triggers auto-scrape after 600ms
+      await page.fill('#fieldWhat', fixture.url);
 
       // Wait for content extraction to complete (entry transitions to done)
       await expect(page.locator('.scrape-entry--done')).toBeVisible({ timeout: 15_000 });
@@ -82,11 +73,11 @@ test.describe('Scraper auto-fetch flow', () => {
 
 test.describe('Multi-URL scrape list', () => {
   test('two URLs → two entries, no auto-scrape', async ({ page }) => {
+    await mockScraper(page);
     await page.goto(CAPTURE_BASE);
 
-    const slug = FIXTURES[0].name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const url1 = `http://127.0.0.1:${fixturePort}/${slug}`;
-    const url2 = `http://127.0.0.1:${fixturePort}/second`;
+    const url1 = FIXTURES[0].url;
+    const url2 = FIXTURES[1].url;
     await page.fill('#fieldWhat', `${url1}\n${url2}`);
 
     // Two entries appear immediately
@@ -96,11 +87,11 @@ test.describe('Multi-URL scrape list', () => {
   });
 
   test('clicking pending entry header triggers scrape', async ({ page }) => {
+    await mockScraper(page);
     await page.goto(CAPTURE_BASE);
 
-    const slug = FIXTURES[0].name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const url1 = `http://127.0.0.1:${fixturePort}/${slug}`;
-    const url2 = `http://127.0.0.1:${fixturePort}/second`;
+    const url1 = FIXTURES[0].url;
+    const url2 = FIXTURES[1].url;
     await page.fill('#fieldWhat', `${url1}\n${url2}`);
 
     // Click the first pending entry header
@@ -113,11 +104,10 @@ test.describe('Multi-URL scrape list', () => {
   });
 
   test('exclude button grays out entry', async ({ page }) => {
+    await mockScraper(page);
     await page.goto(CAPTURE_BASE);
 
-    const slug = FIXTURES[0].name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const targetUrl = `http://127.0.0.1:${fixturePort}/${slug}`;
-    await page.fill('#fieldWhat', targetUrl);
+    await page.fill('#fieldWhat', FIXTURES[0].url);
 
     // Wait for auto-scrape to finish
     await expect(page.locator('.scrape-entry--done')).toBeVisible({ timeout: 15_000 });
@@ -131,11 +121,11 @@ test.describe('Multi-URL scrape list', () => {
   });
 
   test('error state shows retry button', async ({ page }) => {
+    await mockScraper(page);
     await page.goto(CAPTURE_BASE);
 
-    // URL that returns 404 from fixture server → scraper error
-    const badUrl = `http://127.0.0.1:${fixturePort}/does-not-exist`;
-    await page.fill('#fieldWhat', badUrl);
+    // Unknown URL → mock returns 404 → scraper error
+    await page.fill('#fieldWhat', 'https://example.com/not-found');
 
     // Auto-scrape fires, gets 404, transitions to error
     await expect(page.locator('.scrape-entry--error')).toBeVisible({ timeout: 15_000 });

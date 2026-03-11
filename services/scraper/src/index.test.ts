@@ -2,7 +2,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { serve } from "@hono/node-server";
-import { app } from "./app.js";
+import { app } from "./app";
 
 // ── Upstream mock server ───────────────────────────────────────────────────────
 
@@ -145,7 +145,7 @@ describe("Scraper service", () => {
       server: http.Server;
       port: number;
     }>((resolve) => {
-      const server = http.createServer((req, res) => {
+      const server = http.createServer((_req, res) => {
         res.writeHead(301, { Location: mockUrl() });
         res.end();
       });

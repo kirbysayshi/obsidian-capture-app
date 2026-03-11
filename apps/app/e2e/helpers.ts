@@ -7,17 +7,24 @@ import { join } from 'path';
 
 export const FIXTURES_DIR = 'e2e/fixtures';
 
+export interface Fixture {
+  name: string;
+  url: string;
+  expectContains: string[];
+  html: string;
+}
+
 /** Parse a minimal YAML subset: scalar strings and one string-list field. */
-export function parseFrontmatter(text) {
-  const fm = {};
-  let currentListKey = null;
+export function parseFrontmatter(text: string): Record<string, string | string[]> {
+  const fm: Record<string, string | string[]> = {};
+  let currentListKey: string | null = null;
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
     const listItem = line.match(/^  - (.*)$/);
     if (listItem && currentListKey) {
       const val = listItem[1];
       // Strip surrounding single or double quotes used as YAML string delimiters
-      fm[currentListKey].push(
+      (fm[currentListKey] as string[]).push(
         (val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))
           ? val.slice(1, -1)
           : val,
@@ -40,16 +47,21 @@ export function parseFrontmatter(text) {
 }
 
 /** Parse a fixture .md file into { name, url, expectContains, html }. */
-export function parseFixture(filePath) {
+export function parseFixture(filePath: string): Fixture {
   const raw = readFileSync(filePath, 'utf-8');
   const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) throw new Error(`Invalid fixture format: ${filePath}`);
   const [, fmText, html] = match;
   const fm = parseFrontmatter(fmText);
-  return { name: fm.name, url: fm.url, expectContains: fm.expectContains ?? [], html };
+  return {
+    name: fm.name as string,
+    url: fm.url as string,
+    expectContains: (fm.expectContains ?? []) as string[],
+    html,
+  };
 }
 
-export const FIXTURES = readdirSync(FIXTURES_DIR)
+export const FIXTURES: Fixture[] = readdirSync(FIXTURES_DIR)
   .filter(f => f.endsWith('.md'))
   .map(f => parseFixture(join(FIXTURES_DIR, f)));
 

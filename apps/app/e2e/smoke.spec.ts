@@ -1,10 +1,10 @@
-import { test, expect, devices } from '@playwright/test';
+import { test, expect, devices, type TestInfo } from '@playwright/test';
 
 // Strip defaultBrowserType so test.use() can be called inside describe blocks
 const { defaultBrowserType: _a, ...iPhoneSE } = devices['iPhone SE'];
 
 /** Generate a safe screenshot path from the test's title hierarchy. */
-function ss(testInfo, suffix = '') {
+function ss(testInfo: TestInfo, suffix = ''): string {
   const safe = testInfo.titlePath
     .join(' - ')
     .replace(/[^a-z0-9\-_. ]/gi, '_');
@@ -12,7 +12,7 @@ function ss(testInfo, suffix = '') {
 }
 
 /** Unicode-safe base64 encode (handles emoji and non-Latin-1). */
-function toBase64(str) {
+function toBase64(str: string): string {
   return btoa(
     Array.from(new TextEncoder().encode(str))
       .map(b => String.fromCharCode(b))
@@ -20,17 +20,31 @@ function toBase64(str) {
   );
 }
 
+interface PropConfig {
+  k: string;
+  v: string;
+  type?: string;
+}
+
+interface InstanceConfig {
+  vault: string;
+  folder?: string;
+  name?: string;
+  emoji?: string;
+  canvas?: boolean;
+  props?: PropConfig[];
+}
+
 /** Build a ?instances= URL for one or more configs. */
-function instancesUrl(configs) {
-  const data = configs.map(cfg => {
-    const entry = { vault: cfg.vault };
-    if (cfg.folder) entry.folder = cfg.folder;
-    if (cfg.name) entry.name = cfg.name;
-    if (cfg.emoji) entry.emoji = cfg.emoji;
-    if (cfg.canvas) entry.canvas = true;
-    if (cfg.props && cfg.props.length > 0) entry.props = cfg.props;
-    return entry;
-  });
+function instancesUrl(configs: InstanceConfig[]): string {
+  const data = configs.map(cfg => ({
+    vault: cfg.vault,
+    ...(cfg.folder && { folder: cfg.folder }),
+    ...(cfg.name && { name: cfg.name }),
+    ...(cfg.emoji && { emoji: cfg.emoji }),
+    ...(cfg.canvas && { canvas: true }),
+    ...(cfg.props?.length && { props: cfg.props }),
+  }));
   return `/?instances=${encodeURIComponent(toBase64(JSON.stringify(data)))}`;
 }
 
@@ -134,7 +148,7 @@ test.describe('Boolean props — configure view', () => {
 
     // Decode the instances param and verify
     const params = new URL(url).searchParams;
-    const instances = JSON.parse(atob(params.get('instances') ?? ''));
+    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{ props: PropConfig[] }>;
     expect(instances[0].props[0]).toMatchObject({ k: 'published', type: 'boolean', v: 'true' });
   });
 
@@ -267,7 +281,7 @@ test.describe('Multi-instance configure view', () => {
     await page.click('#btnGenerate');
     const url = await page.locator('#useUrlInput').inputValue();
     const params = new URL(url).searchParams;
-    const instances = JSON.parse(atob(params.get('instances') ?? ''));
+    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{ vault: string }>;
     expect(instances).toHaveLength(2);
     expect(instances[0].vault).toBe('VaultA');
     expect(instances[1].vault).toBe('VaultB');
@@ -298,7 +312,7 @@ test.describe('Multi-instance configure view', () => {
 
     const url = await page.locator('#useUrlInput').inputValue();
     const params = new URL(url).searchParams;
-    const instances = JSON.parse(atob(params.get('instances') ?? ''));
+    const instances = JSON.parse(atob(params.get('instances') ?? '')) as Array<{ vault: string; folder: string; name: string }>;
     expect(instances[0]).toMatchObject({ vault: 'MyVault', folder: 'Notes', name: 'My Capture' });
   });
 });

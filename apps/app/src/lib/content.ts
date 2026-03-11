@@ -133,7 +133,7 @@ function parseYtInitialData(html: string, diag?: string[]): Record<string, unkno
  *
  * Desktop uses twoColumnWatchNextResults; mobile uses singleColumnWatchNextResults.
  */
-export function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouTubeContent | null {
+function extractFromYtData(data: Record<string, unknown>, diag?: string[]): YouTubeContent | null {
   // Desktop layout
   const desktopContents = asArr(
     dig(data, 'contents', 'twoColumnWatchNextResults', 'results', 'results', 'contents'),
